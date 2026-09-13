@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Access Bridge — Accessibility Assistant Dashboard</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- ===================== SIDEBAR ===================== -->
+    <aside class="sidebar">
+      <div class="wordmark">
+        <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+          <circle cx="7" cy="13" r="4" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="19" cy="13" r="4" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M11 13H15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Access&nbsp;Bridge
+      </div>
+
+      <ul class="nav-list">
+        <li>
+          <button class="nav-link active" data-view="dashboard" data-accent="">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="13" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
+            Dashboard
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" data-view="blind" data-accent="signal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 12C4.5 7 8 4.5 12 4.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
+            Blind &amp; low-vision
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" data-view="hearing" data-accent="pulse">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 4a6 6 0 0 1 6 6c0 3-2 3.5-2 6a2.5 2.5 0 0 1-5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16 8a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            Deaf &amp; hard-of-hearing
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" data-view="comm" data-accent="bridge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 8h13M13 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 16H7M11 12l-4 4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Communication
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="status-pill">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Checking backend&hellip;</span>
+        </div>
+        <div class="a11y-controls" role="group" aria-label="Display settings">
+          <button id="font-dec" aria-label="Decrease text size" title="Smaller text">A&minus;</button>
+          <button id="font-inc" aria-label="Increase text size" title="Larger text">A+</button>
+          <button id="theme-toggle" aria-label="Toggle light and dark theme" title="Toggle theme">&#9789;</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===================== MAIN COLUMN ===================== -->
+    <div class="main-col">
+      <header class="view-topbar">
+        <div>
+          <h1 id="view-title">Dashboard</h1>
+          <p id="view-subtitle">An overview of everything Access Bridge has recognized.</p>
+        </div>
+      </header>
+
+      <main class="view-area">
+
+        <!-- ===================== DASHBOARD ===================== -->
+        <section class="view active" id="view-dashboard">
+
+          <div class="dash-hero">
+            <div class="hero-copy">
+              <h2>One bridge between sight, sound, and sign.</h2>
+              <p>Point a camera at the world and hear it described. Speak, and see it captioned. Sign, and let it speak for you.</p>
+            </div>
+            <svg class="hero-art" viewBox="0 0 760 260" role="img" aria-label="A hand landmark skeleton connected by a bridging path to a sound waveform">
+              <g>
+                <line class="lm-line" x1="130" y1="230" x2="100" y2="205"/>
+                <line class="lm-line" x1="100" y1="205" x2="78" y2="178"/>
+                <line class="lm-line" x1="78" y1="178" x2="62" y2="155"/>
+                <line class="lm-line" x1="62" y1="155" x2="50" y2="135"/>
+                <line class="lm-line" x1="130" y1="230" x2="112" y2="165"/>
+                <line class="lm-line" x1="112" y1="165" x2="108" y2="120"/>
+                <line class="lm-line" x1="108" y1="120" x2="105" y2="88"/>
+                <line class="lm-line" x1="105" y1="88" x2="103" y2="60"/>
+                <line class="lm-line" x1="112" y1="165" x2="132" y2="160"/>
+                <line class="lm-line" x1="132" y1="160" x2="132" y2="108"/>
+                <line class="lm-line" x1="132" y1="108" x2="132" y2="70"/>
+                <line class="lm-line" x1="132" y1="70" x2="132" y2="38"/>
+                <line class="lm-line" x1="132" y1="160" x2="152" y2="165"/>
+                <line class="lm-line" x1="152" y1="165" x2="156" y2="115"/>
+                <line class="lm-line" x1="156" y1="115" x2="159" y2="82"/>
+                <line class="lm-line" x1="159" y1="82" x2="161" y2="55"/>
+                <line class="lm-line" x1="152" y1="165" x2="172" y2="175"/>
+                <line class="lm-line" x1="172" y1="175" x2="180" y2="135"/>
+                <line class="lm-line" x1="180" y1="135" x2="186" y2="108"/>
+                <line class="lm-line" x1="186" y1="108" x2="190" y2="85"/>
+                <line class="lm-line" x1="130" y1="230" x2="172" y2="175"/>
+                <g class="lm-dot">
+                  <circle cx="130" cy="230" r="4"/>
+                  <circle cx="100" cy="205" r="3"/><circle cx="78" cy="178" r="3"/><circle cx="62" cy="155" r="3"/><circle cx="50" cy="135" r="3.5"/>
+                  <circle cx="112" cy="165" r="3"/><circle cx="108" cy="120" r="3"/><circle cx="105" cy="88" r="3"/><circle cx="103" cy="60" r="3.5"/>
+                  <circle cx="132" cy="160" r="3"/><circle cx="132" cy="108" r="3"/><circle cx="132" cy="70" r="3"/><circle cx="132" cy="38" r="3.5"/>
+                  <circle cx="152" cy="165" r="3"/><circle cx="156" cy="115" r="3"/><circle cx="159" cy="82" r="3"/><circle cx="161" cy="55" r="3.5"/>
+                  <circle cx="172" cy="175" r="3"/><circle cx="180" cy="135" r="3"/><circle cx="186" cy="108" r="3"/><circle cx="190" cy="85" r="3.5"/>
+                </g>
+              </g>
+              <path class="bridge-path" d="M215,150 C 300,80 380,220 455,150"/>
+              <circle class="bridge-dot" r="5"><animateMotion dur="1.4s" begin="0.9s" fill="freeze" path="M215,150 C 300,80 380,220 455,150"/></circle>
+              <g>
+                <rect class="wave-bar" x="460" y="130" width="10" height="40" rx="3" style="animation-delay:0.9s"/>
+                <rect class="wave-bar" x="480" y="105" width="10" height="90" rx="3" style="animation-delay:0.97s"/>
+                <rect class="wave-bar" x="500" y="70"  width="10" height="160" rx="3" style="animation-delay:1.04s"/>
+                <rect class="wave-bar" x="520" y="115" width="10" height="70" rx="3" style="animation-delay:1.11s"/>
+                <rect class="wave-bar" x="540" y="90"  width="10" height="120" rx="3" style="animation-delay:1.18s"/>
+                <rect class="wave-bar" x="560" y="60"  width="10" height="180" rx="3" style="animation-delay:1.25s"/>
+                <rect class="wave-bar" x="580" y="100" width="10" height="100" rx="3" style="animation-delay:1.32s"/>
+              </g>
+            </svg>
+          </div>
+
+          <p class="section-heading">At a glance</p>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="stat-label">Total interactions</div><div class="stat-value" id="stat-total">0</div></div>
+            <div class="stat-card"><div class="stat-label">Avg. confidence</div><div class="stat-value" id="stat-confidence">&mdash;</div></div>
+            <div class="stat-card"><div class="stat-label">Most-used mode</div><div class="stat-value" id="stat-top-mode" style="font-size:var(--step-1)">&mdash;</div></div>
+            <div class="stat-card"><div class="stat-label">Backend</div><div class="stat-value" id="stat-backend" style="font-size:var(--step-1)">&mdash;</div></div>
+          </div>
+
+          <p class="section-heading">Jump to a mode</p>
+          <div class="launch-grid">
+            <button class="launch-card" data-accent="signal" data-view="blind">
+              <span class="launch-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12C4.5 7 8 4.5 12 4.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></span>
+              <h3>Blind &amp; low-vision</h3>
+              <p>Describe what the camera sees, and read text out loud.</p>
+              <span class="launch-go">Open &rarr;</span>
+            </button>
+            <button class="launch-card" data-accent="pulse" data-view="hearing">
+              <span class="launch-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 4a6 6 0 0 1 6 6c0 3-2 3.5-2 6a2.5 2.5 0 0 1-5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16 8a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+              <h3>Deaf &amp; hard-of-hearing</h3>
+              <p>Caption speech, and turn hand signs into text.</p>
+              <span class="launch-go">Open &rarr;</span>
+            </button>
+            <button class="launch-card" data-accent="bridge" data-view="comm">
+              <span class="launch-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8h13M13 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 16H7M11 12l-4 4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <h3>Communication bridge</h3>
+              <p>A shared, two-way conversation view.</p>
+              <span class="launch-go">Open &rarr;</span>
+            </button>
+          </div>
+
+          <p class="section-heading">Recent activity</p>
+          <ul class="activity-list" id="activity-list">
+            <li class="activity-empty">Nothing recognized yet — try a mode above.</li>
+          </ul>
+        </section>
+
+        <!-- ===================== BLIND / LOW-VISION ===================== -->
+        <section class="view" id="view-blind">
+
+          <div class="tool">
+            <h3>What's in front of me</h3>
+            <p class="hint">Take a photo or upload one — objects get named out loud.</p>
+            <div class="input-row">
+              <label class="dropzone" id="object-drop" tabindex="0">
+                <span id="object-filename">Drop a photo here, or click to choose one</span>
+                <input type="file" id="object-file" accept="image/*" />
+              </label>
+              <button class="btn btn-ghost" id="object-cam-btn" type="button">Use camera</button>
+            </div>
+            <div class="camera-box" id="object-camera">
+              <video id="object-video" autoplay playsinline></video>
+              <div class="input-row">
+                <button class="btn btn-primary" id="object-snap" type="button">Capture photo</button>
+                <button class="btn btn-ghost" id="object-cam-close" type="button">Close camera</button>
+              </div>
+            </div>
+            <div class="input-row">
+              <label class="toggle"><input type="checkbox" id="object-speak" checked/><span class="track"></span>Speak the result</label>
+              <button class="btn btn-primary" id="object-btn" type="button">Describe this photo</button>
+            </div>
+            <div class="result" id="object-result"></div>
+          </div>
+
+          <div class="tool">
+            <h3>Read text aloud</h3>
+            <p class="hint">Signs, labels, menus, documents — photograph the text.</p>
+            <div class="input-row">
+              <label class="dropzone" id="ocr-drop" tabindex="0">
+                <span id="ocr-filename">Drop a photo here, or click to choose one</span>
+                <input type="file" id="ocr-file" accept="image/*" />
+              </label>
+              <button class="btn btn-ghost" id="ocr-cam-btn" type="button">Use camera</button>
+            </div>
+            <div class="camera-box" id="ocr-camera">
+              <video id="ocr-video" autoplay playsinline></video>
+              <div class="input-row">
+                <button class="btn btn-primary" id="ocr-snap" type="button">Capture photo</button>
+                <button class="btn btn-ghost" id="ocr-cam-close" type="button">Close camera</button>
+              </div>
+            </div>
+            <div class="input-row">
+              <label class="toggle"><input type="checkbox" id="ocr-speak" checked/><span class="track"></span>Speak the result</label>
+              <button class="btn btn-primary" id="ocr-btn" type="button">Read this text</button>
+            </div>
+            <div class="result" id="ocr-result"></div>
+          </div>
+
+        </section>
+
+        <!-- ===================== HEARING ===================== -->
+        <section class="view" id="view-hearing">
+
+          <div class="tool">
+            <h3>Speech to captions</h3>
+            <p class="hint">Record someone speaking, or upload an audio clip.</p>
+            <div class="input-row">
+              <button class="btn btn-ghost" id="speech-record-btn" type="button">Record audio</button>
+              <label class="dropzone" id="speech-drop" tabindex="0" style="flex:1">
+                <span id="speech-filename">Or drop / choose an audio file</span>
+                <input type="file" id="speech-file" accept="audio/*" />
+              </label>
+            </div>
+            <div class="input-row">
+              <button class="btn btn-primary accent-pulse" id="speech-btn" type="button">Transcribe</button>
+            </div>
+            <div class="result" id="speech-result"></div>
+          </div>
+
+          <div class="tool">
+            <h3>Sign to text</h3>
+            <p class="hint">Show a hand sign to the camera, or upload a photo.</p>
+            <div class="input-row">
+              <label class="dropzone" id="sign-drop" tabindex="0">
+                <span id="sign-filename">Drop a photo here, or click to choose one</span>
+                <input type="file" id="sign-file" accept="image/*" />
+              </label>
+              <button class="btn btn-ghost" id="sign-cam-btn" type="button">Use camera</button>
+            </div>
+            <div class="camera-box" id="sign-camera">
+              <video id="sign-video" autoplay playsinline></video>
+              <div class="input-row">
+                <button class="btn btn-primary accent-pulse" id="sign-snap" type="button">Capture photo</button>
+                <button class="btn btn-ghost" id="sign-cam-close" type="button">Close camera</button>
+              </div>
+            </div>
+            <div class="input-row">
+              <label class="toggle"><input type="checkbox" id="sign-speak"/><span class="track"></span>Speak the result</label>
+              <button class="btn btn-primary accent-pulse" id="sign-btn" type="button">Recognize sign</button>
+            </div>
+            <div class="result" id="sign-result"></div>
+          </div>
+
+        </section>
+
+        <!-- ===================== COMMUNICATION ===================== -->
+        <section class="view" id="view-comm">
+
+          <div class="tool">
+            <h3>Conversation</h3>
+            <div class="transcript" id="transcript">
+              <p class="transcript-empty">Nothing said yet — speak, sign, or type below to start.</p>
+            </div>
+          </div>
+
+          <div class="comm-controls">
+            <div class="side">
+              <h4>Hearing participant</h4>
+              <button class="btn btn-primary" id="h2d-record-btn" type="button">Record speech</button>
+              <label class="dropzone" id="h2d-drop" tabindex="0">
+                <span id="h2d-filename">Or drop / choose an audio file</span>
+                <input type="file" id="h2d-file" accept="audio/*" />
+              </label>
+              <button class="btn btn-ghost" id="h2d-btn" type="button">Send to conversation</button>
+            </div>
+            <div class="side">
+              <h4>Deaf / hard-of-hearing participant</h4>
+              <button class="btn btn-primary accent-pulse" id="d2h-cam-btn" type="button">Use camera to sign</button>
+              <div class="camera-box" id="d2h-camera">
+                <video id="d2h-video" autoplay playsinline></video>
+                <div class="input-row">
+                  <button class="btn btn-primary accent-pulse" id="d2h-snap" type="button">Capture &amp; send</button>
+                  <button class="btn btn-ghost" id="d2h-cam-close" type="button">Close camera</button>
+                </div>
+              </div>
+              <label class="dropzone" id="d2h-drop" tabindex="0">
+                <span id="d2h-filename">Or drop / choose a photo</span>
+                <input type="file" id="d2h-file" accept="image/*" />
+              </label>
+              <button class="btn btn-ghost" id="d2h-btn" type="button">Send photo to conversation</button>
+              <div class="type-row">
+                <input type="text" id="type-input" placeholder="Or type a message&hellip;" />
+                <button class="btn btn-ghost" id="type-btn" type="button">Send</button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

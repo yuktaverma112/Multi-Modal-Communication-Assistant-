@@ -1,0 +1,46 @@
+# ==========================================================
+# AI-Based Multi-Modal Accessibility Assistant - requirements
+# ==========================================================
+# Tested with Python 3.10/3.11/3.12
+# Install with:  pip install -r requirements.txt
+#
+# Kept to exactly what the code imports. Extras that were in an earlier
+# draft but unused anywhere (tensorflow, librosa, sounddevice, soundfile,
+# edge-tts, an explicit pydantic pin) were removed -- add them back only
+# when you actually build the feature that needs them (e.g. tensorflow +
+# librosa for the Phase 2 ESC-50 emergency-sound classifier).
+
+# --- Backend ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+python-dotenv==1.0.1          # loads .env automatically, see backend/config.py
+
+# --- Computer Vision / Object Detection ---
+opencv-python==4.10.0.84
+ultralytics==8.3.63          # YOLO (pretrained on COCO)
+numpy==1.26.4
+
+# --- OCR ---
+easyocr==1.7.2                # primary backend (heavier, needs PyTorch)
+pytesseract==0.3.13           # lightweight offline fallback -- also needs
+                               # `apt install tesseract-ocr` on the system
+pillow==11.0.0
+
+# --- Hand tracking / Sign language ---
+mediapipe==0.10.14
+scikit-learn==1.5.2
+joblib==1.4.2
+
+# --- Speech ---
+openai-whisper==20240930
+
+# --- Text-to-Speech ---
+pyttsx3==2.98
+
+# --- Database ---
+sqlalchemy==2.0.36
+
+# --- Dev / testing ---
+pytest==8.3.4
+httpx==0.28.1

@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Local config / secrets
+.env
+
+# Runtime outputs (generated audio, uploaded files, sqlite db)
+outputs/uploads/*
+outputs/tts/*
+!outputs/uploads/.gitkeep
+!outputs/tts/.gitkeep
+backend/database/*.db
+
+# Large downloaded model weights (re-downloaded on first run instead of committed)
+models/yolo/*.pt
+models/mediapipe/*.task
+
+# WLASL actual video clips (only metadata/CSV is committed, see scripts/download_wlasl_clips.py)
+datasets/sign_language/WLASL100/videos/
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
