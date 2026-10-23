@@ -15,10 +15,17 @@ router = APIRouter(prefix="/api", tags=["sign_language"])
 async def recognize_sign(
     file: UploadFile = File(...),
     speak: bool = False,
+    log: bool = True,
     db: Session = Depends(get_db),
 ):
-    """Hearing-mode / communication-mode pipeline:
-    Camera -> MediaPipe/HOG -> MLP -> sign -> text/voice."""
+    """Hearing-mode / communication-mode / live-translate pipeline:
+    Camera -> MediaPipe/HOG -> MLP -> sign -> text/voice.
+
+    log=False is used by the real-time polling loop in the Live
+    Translate view (frontend/static/js/live.js), which calls this
+    endpoint several times a second -- logging every poll would flood
+    /api/history with noise instead of meaningful interactions. The
+    one-shot "Recognize sign" button elsewhere still logs by default."""
     try:
         image = decode_image_bytes(await file.read())
     except ValueError as e:
@@ -28,7 +35,8 @@ async def recognize_sign(
     if result.get("prediction") is None:
         return error(result.get("error", "No sign recognized."), code=422)
 
-    crud.log_prediction(db, "sign_language", result["prediction"], confidence=result["confidence"])
+    if log:
+        crud.log_prediction(db, "sign_language", result["prediction"], confidence=result["confidence"])
 
     audio_path = tts_service.speak_to_file(result["prediction"]) if speak else None
     result["audio_path"] = audio_path

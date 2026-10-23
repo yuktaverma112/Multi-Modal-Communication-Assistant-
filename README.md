@@ -22,7 +22,8 @@ blowing the sandbox's disk quota.
 | OCR | **Working**, pytesseract backend verified on 6 clean synthetic signs + 1 CAPTCHA (accuracy contrast is expected/documented). EasyOCR wired as the primary backend for when you install it. |
 | Text-to-speech | **Working**, produces real `.wav` files via pyttsx3/espeak-ng. |
 | FastAPI backend + routing + SQLite history | **Working**, verified end-to-end via `scripts/demo_pipeline.py` and `pytest`. |
-| Frontend (Blind/Hearing/Communication) | **Working & redesigned** -- accordion layout, camera/mic capture, confidence-colored results, conversation transcript. See "Frontend design" below. |
+| Frontend (dashboard + modes) | **Working** -- sidebar nav, live stats, camera/mic capture, confidence-colored results, conversation transcript. See "Frontend design" below. |
+| **Live Translate (real-time)** | **Working.** Live camera → debounced letter-by-letter sign recognition → sentence → instant browser speech. Live microphone → real-time streaming captions (Web Speech API) with a Whisper-backed fallback. See "Live Translate" below for the accuracy caveat that comes with it. |
 | Object detection (YOLO/COCO) | **Coded, not executed here.** Needs `pip install ultralytics` (pulls PyTorch, downloads `yolo11n.pt` on first run). |
 | Speech-to-text (Whisper) | **Coded, not executed here.** Needs `pip install openai-whisper` + ffmpeg (downloads a ~140MB model on first run). |
 | Emergency sound detection (ESC-50, Phase 2) | **Not started.** ESC-50 wasn't part of your uploads; folder is ready at `datasets/sound/ESC-50/`. |
@@ -48,6 +49,18 @@ Run the offline smoke test any time to confirm your environment is set up correc
 python scripts/demo_pipeline.py
 pytest -q
 ```
+
+## Live Translate: real-time sign-to-speech and speech-to-captions
+
+This is the flagship feature: a continuous, live session using your camera, microphone and speaker instead of one-photo-at-a-time snapshots. Open the "Live Translate" view (new sidebar entry, also featured first on the dashboard).
+
+**Sign → Speech** (camera): a dashed guide box appears over the live video feed. Hold a hand sign inside it; the app samples that region ~2-3 times a second and sends each crop to `/api/recognize-sign?log=false`. A letter is only added to the sentence once the *same* prediction holds steady for several consecutive samples above a confidence threshold -- this debouncing is what turns "noisy per-frame guesses" into "one clean letter per held pose" instead of spamming the same letter 10 times while you hold it. Space / Backspace / Clear controls build it into a word or sentence, and "Speak" (or the auto-speak-on-pause toggle) reads it aloud instantly using the browser's built-in `speechSynthesis` -- no server round-trip for the speaking-impaired user's "voice."
+
+**Speech → Captions** (microphone): uses the browser's native `SpeechRecognition` API for genuinely real-time, streaming captions -- no backend call per word, interim results appear as you speak. Chrome/Edge support this; browsers that don't (notably Firefox) automatically get a fallback: record a clip, then transcribe it through the existing Whisper backend.
+
+**Why the guide box, and an honest accuracy note**: the shipped sign-recognition model was trained on tightly-cropped hand images (see "Dataset notes" below), using HOG features because this development sandbox couldn't reach the internet host MediaPipe needs for its landmark model. HOG is sensitive to framing -- a hand filling a cropped training photo looks very different, numerically, from a small hand in a wide live webcam shot. The guide box exists to make live captures resemble the training distribution as closely as possible. **On your own machine (with normal internet access), MediaPipe's hand-landmark model *will* download successfully**, and `backend/utils/preprocessing.py` already tries that path first -- it's scale/position-invariant and far more robust for live camera use than HOG. For best real-time accuracy, re-run `python scripts/extract_isl_landmarks.py` and `python scripts/train_sign_model.py` once on a machine with internet access, so the shipped model is landmark-based rather than the HOG fallback this sandbox had to use. Either way, expect the 23-letter, single-signer-dataset accuracy ceiling described below -- this is a working real-time pipeline, not a production-grade ASL/ISL recognizer.
+
+Live polling intentionally does **not** write to `/api/history` (it would be dozens of rows a minute of noise). Instead, one meaningful event is logged per session -- a spoken sentence, or a finished captioning session -- via `POST /api/history/log`, so the dashboard still reflects real usage without the spam.
 
 ## Architecture
 
@@ -86,12 +99,13 @@ Each pipe maps 1:1 to a FastAPI endpoint:
 | `POST /api/detect-object` | Camera → YOLO → objects → (optional) TTS |
 | `POST /api/read-text` | Image → OCR → text → (optional) TTS |
 | `POST /api/speech-to-text` | Audio → Whisper → text |
-| `POST /api/recognize-sign` | Image → MediaPipe/HOG → MLP → sign → (optional) TTS |
+| `POST /api/recognize-sign` | Image → MediaPipe/HOG → MLP → sign → (optional) TTS. `log=false` (used by Live Translate) skips the history write. |
 | `POST /api/text-to-speech` | text → audio |
 | `POST /api/communicate/hearing-to-deaf` | Audio → text (for a deaf participant to read) |
 | `POST /api/communicate/deaf-to-hearing` | Sign image → text + audio (for a hearing participant) |
 | `POST /api/communicate/type-to-hearing` | Typed fallback → audio |
 | `GET /api/history` | Recent predictions (metadata only, see Privacy) |
+| `POST /api/history/log` | Logs one finished event (a spoken sentence, a captioning session) -- used by Live Translate instead of logging every poll |
 | `GET /api/health` | Liveness check |
 
 Interactive docs: `http://localhost:8000/docs`.
@@ -161,7 +175,7 @@ Run `python scripts/demo_pipeline.py` to reproduce steps 1-3 yourself.
 - **Your "custom OCR dataset" upload was actually a CAPTCHA dataset** (`alizahidraja/captcha-data`), which is adversarial by design (meant to defeat OCR), not representative of "reading signs, documents, labels" per the guide. `scripts/generate_ocr_samples.py` builds a small, fair substitute; replace `datasets/ocr/custom_OCR/synthetic/` with 300-500 real photos of signs/menus/documents for a proper evaluation, per the guide's section 5.
 - **WLASL is American Sign Language, not Indian Sign Language.** Use it only for initial pipeline benchmarking; `custom_ISL` is this project's real India-focused contribution. State this limitation explicitly in your report (the guide calls this out too).
 - **COCO annotations**: only `instances_val2017.json`'s 80 category names were kept (`datasets/object_detection_coco/coco_80_classes.json`) -- per the guide, retraining YOLO on full COCO isn't necessary or intended; the pretrained Ultralytics weights already cover it.
-- **44.7% ISL test accuracy is a small-dataset, HOG-feature, random-split number** -- expected to improve substantially with (a) MediaPipe landmarks instead of HOG once a machine has internet for the model download, (b) more images per class, and (c) is likely optimistic vs. reality since the split isn't by signer. Do the guide's recommended **unseen-signer test** (train on some people, test on different people) once you collect your own multi-volunteer recordings.
+- **44.7% ISL test accuracy is a small-dataset, HOG-feature, random-split number** (this is also why Live Translate's debouncing commits a letter only after several consistent frames -- it compensates for a noisier underlying classifier, not just camera jitter) -- expected to improve substantially with (a) MediaPipe landmarks instead of HOG once a machine has internet for the model download, (b) more images per class, and (c) is likely optimistic vs. reality since the split isn't by signer. Do the guide's recommended **unseen-signer test** (train on some people, test on different people) once you collect your own multi-volunteer recordings.
 
 ## Frontend design
 

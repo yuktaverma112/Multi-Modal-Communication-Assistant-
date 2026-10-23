@@ -72,13 +72,21 @@ function toast(message) {
 
 const VIEW_META = {
   dashboard: { title: "Dashboard", subtitle: "An overview of everything Access Bridge has recognized." },
+  live: { title: "Live Translate", subtitle: "Real-time camera sign recognition and live speech captions, side by side." },
   blind: { title: "Blind & low-vision", subtitle: "Hear what's in front of you, and read text out loud." },
   hearing: { title: "Deaf & hard-of-hearing", subtitle: "Turn speech into captions, and signs into text." },
   comm: { title: "Communication bridge", subtitle: "A shared conversation between a hearing and a deaf participant." },
 };
 
+let currentView = "dashboard";
+
 function navigate(view) {
   if (!VIEW_META[view]) view = "dashboard";
+
+  // Leaving the Live Translate view always stops camera/mic -- nothing
+  // should keep recording in the background once it's off-screen.
+  if (currentView === "live" && view !== "live") stopLiveTranslate();
+  currentView = view;
 
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   $(`view-${view}`).classList.add("active");
@@ -93,6 +101,9 @@ function navigate(view) {
   history.replaceState(null, "", `#${view}`);
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 }
+
+// Also stop everything if the person closes/reloads the tab mid-session.
+window.addEventListener("beforeunload", () => stopLiveTranslate());
 
 document.querySelectorAll("[data-view]").forEach((el) => {
   el.addEventListener("click", () => navigate(el.dataset.view));
@@ -479,3 +490,325 @@ $("type-btn").addEventListener("click", async () => {
   addBubble("deaf", text, json.data.audio_path);
   $("type-input").value = "";
 });
+
+/* =========================================================================
+   LIVE TRANSLATE
+   Real-time camera -> sign -> sentence, and real-time speech -> captions.
+   ========================================================================= */
+
+/* ---------- Sign -> Speech: live camera + polling + debounce ---------- */
+
+const POLL_INTERVAL_MS = 400;       // how often we sample the camera
+const COMMIT_STREAK = 4;            // consecutive matching polls needed to commit a letter
+const COMMIT_CONFIDENCE = 0.55;     // minimum confidence to even consider a candidate
+
+let liveStream = null;
+let pollTimer = null;
+let candidateLabel = null;
+let candidateStreak = 0;
+let lastCommittedLabel = null;
+let requireBreakBeforeRepeat = false;
+let sentenceText = "";
+let lastCommitTime = 0;
+let spokenThisPause = true;
+
+function setLiveIndicator(id, active, label) {
+  const el = $(id);
+  el.classList.toggle("active", active);
+  el.lastChild.textContent = label;
+}
+
+function renderSentence() {
+  const box = $("sentence-box");
+  box.innerHTML = sentenceText
+    ? sentenceText.replace(/</g, "&lt;")
+    : `<span class="sentence-placeholder">Your signed letters will build up here&hellip;</span>`;
+}
+
+function renderCandidate(label, conf, streak) {
+  const row = $("candidate-row");
+  if (!label) { row.hidden = true; return; }
+  row.hidden = false;
+  $("candidate-label").textContent = label;
+  $("candidate-fill").style.width = `${Math.round((conf || 0) * 100)}%`;
+  const dot = $("candidate-dot");
+  dot.className = "confidence-dot " + (streak >= COMMIT_STREAK ? "high" : streak >= 2 ? "mid" : "low");
+}
+
+async function pollLiveFrame() {
+  const video = $("live-video");
+  if (!video.videoWidth) return;
+
+  // Crop to the guide box so what we send matches the framing the
+  // model was trained on (a zoomed-in hand), not a wide room shot.
+  const guide = $("guide-box");
+  const videoRect = video.getBoundingClientRect();
+  const guideRect = guide.getBoundingClientRect();
+  const scaleX = video.videoWidth / videoRect.width;
+  const scaleY = video.videoHeight / videoRect.height;
+  const sx = (guideRect.left - videoRect.left) * scaleX;
+  const sy = (guideRect.top - videoRect.top) * scaleY;
+  const sw = guideRect.width * scaleX;
+  const sh = guideRect.height * scaleY;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = sw;
+  canvas.height = sh;
+  canvas.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+
+  const fd = new FormData();
+  fd.append("file", blob, "frame.jpg");
+
+  let json;
+  try {
+    const res = await fetch(`${API}/api/recognize-sign?log=false`, { method: "POST", body: fd });
+    json = await res.json();
+  } catch (err) {
+    return; // transient network hiccup -- just skip this poll
+  }
+
+  if (json.code !== 200 || !json.data.prediction) {
+    $("live-status-chip").textContent = "No hand detected in the guide box";
+    candidateLabel = null;
+    candidateStreak = 0;
+    renderCandidate(null);
+    return;
+  }
+
+  const { prediction, confidence } = json.data;
+  $("live-status-chip").textContent = "Watching\u2026";
+
+  if (confidence < COMMIT_CONFIDENCE) {
+    candidateLabel = null;
+    candidateStreak = 0;
+    renderCandidate(prediction, confidence, 0);
+    return;
+  }
+
+  if (prediction === candidateLabel) {
+    candidateStreak += 1;
+  } else {
+    candidateLabel = prediction;
+    candidateStreak = 1;
+  }
+
+  // Once the held pose differs from whatever we last committed, the
+  // "must see a break before repeating the same letter" rule clears,
+  // so e.g. double letters like "LL" become possible again.
+  if (prediction !== lastCommittedLabel) requireBreakBeforeRepeat = false;
+
+  renderCandidate(candidateLabel, confidence, candidateStreak);
+
+  const readyToCommit =
+    candidateStreak >= COMMIT_STREAK &&
+    !(candidateLabel === lastCommittedLabel && requireBreakBeforeRepeat);
+
+  if (readyToCommit) {
+    sentenceText += candidateLabel;
+    renderSentence();
+    lastCommittedLabel = candidateLabel;
+    requireBreakBeforeRepeat = true;
+    lastCommitTime = Date.now();
+    spokenThisPause = false;
+    candidateStreak = 0;
+    $("live-status-chip").textContent = `Added "${candidateLabel}"`;
+  }
+}
+
+async function startLiveCamera() {
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+  } catch (err) {
+    toast("Couldn't access the camera -- check your browser permissions.");
+    return;
+  }
+  $("live-video").srcObject = liveStream;
+  $("live-cam-toggle").textContent = "Stop camera";
+  setLiveIndicator("sign-live-indicator", true, "live");
+  $("live-status-chip").textContent = "Watching\u2026";
+  pollTimer = setInterval(pollLiveFrame, POLL_INTERVAL_MS);
+
+  // Auto-speak-on-pause watcher: separate from the fast poll loop.
+  pauseWatcher = setInterval(() => {
+    if (!$("auto-speak").checked || spokenThisPause || !sentenceText) return;
+    if (Date.now() - lastCommitTime > 1500) {
+      speakSentence();
+      spokenThisPause = true;
+    }
+  }, 500);
+}
+
+let pauseWatcher = null;
+
+function stopLiveCamera() {
+  if (pollTimer) clearInterval(pollTimer);
+  if (pauseWatcher) clearInterval(pauseWatcher);
+  pollTimer = null;
+  pauseWatcher = null;
+  if (liveStream) liveStream.getTracks().forEach((t) => t.stop());
+  liveStream = null;
+  $("live-video").srcObject = null;
+  $("live-cam-toggle").textContent = "Start camera";
+  setLiveIndicator("sign-live-indicator", false, "off");
+  $("live-status-chip").textContent = "Camera off";
+  renderCandidate(null);
+  candidateLabel = null;
+  candidateStreak = 0;
+}
+
+$("live-cam-toggle").addEventListener("click", () => {
+  if (liveStream) stopLiveCamera();
+  else startLiveCamera();
+});
+
+function speakSentence() {
+  if (!sentenceText.trim()) return;
+  if ("speechSynthesis" in window) {
+    const utter = new SpeechSynthesisUtterance(sentenceText);
+    window.speechSynthesis.cancel(); // don't queue up stale sentences
+    window.speechSynthesis.speak(utter);
+  } else {
+    toast("This browser doesn't support spoken output.");
+  }
+  // Log the finished sentence as one meaningful event (not every poll).
+  const fd = new FormData();
+  fd.append("modality", "sign_language");
+  fd.append("text", sentenceText);
+  fetch(`${API}/api/history/log`, { method: "POST", body: fd }).then(() => {
+    if (currentView === "dashboard") refreshDashboard();
+  });
+}
+
+$("sentence-speak").addEventListener("click", speakSentence);
+$("sentence-space").addEventListener("click", () => { sentenceText += " "; renderSentence(); });
+$("sentence-backspace").addEventListener("click", () => { sentenceText = sentenceText.slice(0, -1); renderSentence(); });
+$("sentence-clear").addEventListener("click", () => {
+  sentenceText = "";
+  lastCommittedLabel = null;
+  requireBreakBeforeRepeat = false;
+  renderSentence();
+});
+
+/* ---------- Speech -> Captions: Web Speech API, with a recorded-clip fallback ---------- */
+
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer = null;
+let listening = false;
+let captionFinalText = "";
+
+function renderCaptions(interim) {
+  const box = $("caption-box");
+  const final = captionFinalText.replace(/</g, "&lt;");
+  const interimSafe = (interim || "").replace(/</g, "&lt;");
+  if (!final && !interimSafe) {
+    box.innerHTML = `<span class="sentence-placeholder">Captions will appear here while listening&hellip;</span>`;
+  } else {
+    box.innerHTML = `${final}<span class="caption-interim">${interimSafe}</span>`;
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function logCaptionSession() {
+  const text = captionFinalText.trim();
+  if (!text) return;
+  const fd = new FormData();
+  fd.append("modality", "speech");
+  fd.append("text", text);
+  fetch(`${API}/api/history/log`, { method: "POST", body: fd }).then(() => {
+    if (currentView === "dashboard") refreshDashboard();
+  });
+}
+
+function startCaptions() {
+  recognizer = new SpeechRecognitionAPI();
+  recognizer.continuous = true;
+  recognizer.interimResults = true;
+  recognizer.lang = "en-US";
+
+  recognizer.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) captionFinalText += transcript + " ";
+      else interim += transcript;
+    }
+    renderCaptions(interim);
+  };
+  recognizer.onerror = () => { /* transient errors (e.g. brief silence) are not fatal */ };
+  recognizer.onend = () => {
+    if (listening) recognizer.start(); // browsers stop after a pause -- restart while active
+  };
+
+  listening = true;
+  recognizer.start();
+  $("caption-toggle").textContent = "Stop listening";
+  setLiveIndicator("caption-live-indicator", true, "live");
+}
+
+function stopCaptions() {
+  listening = false;
+  if (recognizer) recognizer.stop();
+  $("caption-toggle").textContent = "Start listening";
+  setLiveIndicator("caption-live-indicator", false, "off");
+  logCaptionSession();
+}
+
+if (SpeechRecognitionAPI) {
+  $("caption-toggle").addEventListener("click", () => {
+    if (listening) stopCaptions();
+    else startCaptions();
+  });
+} else {
+  $("caption-toggle").hidden = true;
+  $("caption-fallback").hidden = false;
+
+  let fallbackRecorder = null;
+  let fallbackChunks = [];
+  let fallbackBlob = null;
+
+  $("caption-record-btn").addEventListener("click", async () => {
+    if (fallbackRecorder && fallbackRecorder.state === "recording") {
+      fallbackRecorder.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      fallbackRecorder = new MediaRecorder(stream);
+      fallbackChunks = [];
+      fallbackRecorder.ondataavailable = (e) => fallbackChunks.push(e.data);
+      fallbackRecorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        fallbackBlob = new Blob(fallbackChunks, { type: "audio/webm" });
+        $("caption-record-btn").textContent = "Record audio";
+      };
+      $("caption-record-btn").textContent = "Stop recording";
+      fallbackRecorder.start();
+    } catch (err) {
+      toast("Couldn't access the microphone -- check your browser permissions.");
+    }
+  });
+
+  $("caption-upload-btn").addEventListener("click", async () => {
+    if (!fallbackBlob) return toast("Record a clip first.");
+    const fd = new FormData();
+    fd.append("file", fallbackBlob, "clip.webm");
+    const res = await fetch(`${API}/api/speech-to-text`, { method: "POST", body: fd });
+    const json = await res.json();
+    if (json.code !== 200) return toast(json.message);
+    captionFinalText += json.data.text + " ";
+    renderCaptions("");
+  });
+}
+
+$("caption-clear").addEventListener("click", () => {
+  captionFinalText = "";
+  renderCaptions("");
+});
+
+/* ---------- Shared cleanup ---------- */
+
+function stopLiveTranslate() {
+  if (liveStream) stopLiveCamera();
+  if (listening) stopCaptions();
+}

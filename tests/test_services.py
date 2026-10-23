@@ -66,3 +66,32 @@ def test_api_health():
         r = client.get("/api/health")
         assert r.status_code == 200
         assert r.json()["data"]["status"] == "up"
+
+
+def test_recognize_sign_log_false_skips_history():
+    """The Live Translate polling loop passes log=false so it doesn't
+    flood /api/history with a row every ~400ms."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    with TestClient(app) as client:
+        before = len(client.get("/api/history").json()["data"])
+        with open(sample, "rb") as f:
+            r = client.post("/api/recognize-sign?log=false", files={"file": ("a.jpg", f, "image/jpeg")})
+        assert r.status_code == 200
+        after = len(client.get("/api/history").json()["data"])
+        assert after == before  # unchanged -- the poll was not logged
+
+
+def test_history_log_endpoint_records_a_committed_event():
+    """Live Translate logs one meaningful event (a spoken sentence, a
+    finished caption session) via this endpoint instead of every poll."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    with TestClient(app) as client:
+        r = client.post("/api/history/log", data={"modality": "sign_language", "text": "HELLO", "confidence": "0.9"})
+        assert r.status_code == 200
+        rows = client.get("/api/history?modality=sign_language").json()["data"]
+        assert any(row["result_text"] == "HELLO" for row in rows)
