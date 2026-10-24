@@ -84,6 +84,25 @@ def test_recognize_sign_log_false_skips_history():
         assert after == before  # unchanged -- the poll was not logged
 
 
+def test_detect_object_degrades_cleanly_or_works():
+    """Object detection needs ultralytics installed (+ a one-time YOLO
+    weight download). This must never 500-crash either way -- a clean
+    200 with real detections if it's available, or a clean 503 with an
+    actionable message if it isn't."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    sample = os.path.join(ROOT, "datasets", "ocr", "custom_OCR", "synthetic", "sample_00.png")
+    with TestClient(app) as client:
+        with open(sample, "rb") as f:
+            r = client.post("/api/detect-object", files={"file": ("photo.png", f, "image/png")})
+        assert r.status_code == 200  # our envelope -- real status is in the body
+        body = r.json()
+        assert body["code"] in (200, 503)
+        if body["code"] == 200:
+            assert "description" in body["data"]
+
+
 def test_word_model_status_reflects_reality():
     """No word-level model ships with this project (see README) -- this
     must report trained:false, not silently claim otherwise."""
