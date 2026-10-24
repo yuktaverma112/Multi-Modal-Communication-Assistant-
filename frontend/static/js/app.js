@@ -806,6 +806,62 @@ $("caption-clear").addEventListener("click", () => {
   renderCaptions("");
 });
 
+/* ---------- Whole-word signs (only if a word model has been trained) ---------- */
+
+fetch(`${API}/api/word-model-status`)
+  .then((r) => r.json())
+  .then((json) => {
+    const trained = json.code === 200 && json.data.trained;
+    $("word-mode-box").hidden = !trained;
+    $("word-mode-unavailable").hidden = trained;
+  })
+  .catch(() => { /* leave the "not trained yet" message showing */ });
+
+let wordRecorder = null;
+let wordChunks = [];
+
+function startWordRecording() {
+  if (!liveStream) return toast("Start the camera first.");
+  wordChunks = [];
+  wordRecorder = new MediaRecorder(liveStream, { mimeType: "video/webm" });
+  wordRecorder.ondataavailable = (e) => wordChunks.push(e.data);
+  wordRecorder.onstop = sendWordClip;
+  wordRecorder.start();
+  $("word-record-btn").textContent = "\u25CF Recording\u2026 release to send";
+  $("word-record-btn").classList.add("recording");
+}
+
+function stopWordRecording() {
+  if (wordRecorder && wordRecorder.state === "recording") wordRecorder.stop();
+  $("word-record-btn").textContent = "\u25CF Record word";
+  $("word-record-btn").classList.remove("recording");
+}
+
+async function sendWordClip() {
+  const blob = new Blob(wordChunks, { type: "video/webm" });
+  $("word-mode-result").textContent = "Recognizing\u2026";
+  const fd = new FormData();
+  fd.append("file", blob, "word.webm");
+  const res = await fetch(`${API}/api/recognize-word?log=false`, { method: "POST", body: fd });
+  const json = await res.json();
+  if (json.code !== 200) {
+    $("word-mode-result").textContent = json.message;
+    return;
+  }
+  $("word-mode-result").textContent = `"${json.data.prediction}" (${Math.round(json.data.confidence * 100)}%)`;
+  sentenceText += (sentenceText && !sentenceText.endsWith(" ") ? " " : "") + json.data.prediction.toUpperCase() + " ";
+  renderSentence();
+  lastCommitTime = Date.now();
+  spokenThisPause = false;
+}
+
+const wordBtn = $("word-record-btn");
+wordBtn.addEventListener("mousedown", startWordRecording);
+wordBtn.addEventListener("mouseup", stopWordRecording);
+wordBtn.addEventListener("mouseleave", stopWordRecording);
+wordBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startWordRecording(); });
+wordBtn.addEventListener("touchend", (e) => { e.preventDefault(); stopWordRecording(); });
+
 /* ---------- Shared cleanup ---------- */
 
 function stopLiveTranslate() {

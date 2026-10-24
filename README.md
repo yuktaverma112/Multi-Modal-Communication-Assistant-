@@ -24,6 +24,7 @@ blowing the sandbox's disk quota.
 | FastAPI backend + routing + SQLite history | **Working**, verified end-to-end via `scripts/demo_pipeline.py` and `pytest`. |
 | Frontend (dashboard + modes) | **Working** -- sidebar nav, live stats, camera/mic capture, confidence-colored results, conversation transcript. See "Frontend design" below. |
 | **Live Translate (real-time)** | **Working.** Live camera → debounced letter-by-letter sign recognition → sentence → instant browser speech. Live microphone → real-time streaming captions (Web Speech API) with a Whisper-backed fallback. See "Live Translate" below for the accuracy caveat that comes with it. |
+| Whole-word signs | **Infrastructure complete and tested; no model shipped.** Extraction/training/serving pipeline verified working via a synthetic smoke test (then deleted). Needs real word-sign video, which this sandbox's network can't fetch -- see "Whole-word signs" below. |
 | Object detection (YOLO/COCO) | **Coded, not executed here.** Needs `pip install ultralytics` (pulls PyTorch, downloads `yolo11n.pt` on first run). |
 | Speech-to-text (Whisper) | **Coded, not executed here.** Needs `pip install openai-whisper` + ffmpeg (downloads a ~140MB model on first run). |
 | Emergency sound detection (ESC-50, Phase 2) | **Not started.** ESC-50 wasn't part of your uploads; folder is ready at `datasets/sound/ESC-50/`. |
@@ -61,6 +62,22 @@ This is the flagship feature: a continuous, live session using your camera, micr
 **Why the guide box, and an honest accuracy note**: the shipped sign-recognition model was trained on tightly-cropped hand images (see "Dataset notes" below), using HOG features because this development sandbox couldn't reach the internet host MediaPipe needs for its landmark model. HOG is sensitive to framing -- a hand filling a cropped training photo looks very different, numerically, from a small hand in a wide live webcam shot. The guide box exists to make live captures resemble the training distribution as closely as possible. **On your own machine (with normal internet access), MediaPipe's hand-landmark model *will* download successfully**, and `backend/utils/preprocessing.py` already tries that path first -- it's scale/position-invariant and far more robust for live camera use than HOG. For best real-time accuracy, re-run `python scripts/extract_isl_landmarks.py` and `python scripts/train_sign_model.py` once on a machine with internet access, so the shipped model is landmark-based rather than the HOG fallback this sandbox had to use. Either way, expect the 23-letter, single-signer-dataset accuracy ceiling described below -- this is a working real-time pipeline, not a production-grade ASL/ISL recognizer.
 
 Live polling intentionally does **not** write to `/api/history` (it would be dozens of rows a minute of noise). Instead, one meaningful event is logged per session -- a spoken sentence, or a finished captioning session -- via `POST /api/history/log`, so the dashboard still reflects real usage without the spam.
+
+## Whole-word signs (uses the previously-unused WLASL data)
+
+`datasets/sign_language/WLASL100/` shipped with this project from the start but sat unused -- 100 English word glosses and ~2,000 video-clip URLs, metadata only, no actual video. I tried to make real use of it and hit a hard wall worth being upfront about: **every WLASL video host is blocked by this sandbox's network** -- confirmed directly (DNS resolution fails for YouTube, Yale's ASL sign bank, aslbricks.org, aslpro.com, handspeak.com, and the rest). I also searched for an alternative pre-extracted landmark dataset reachable from here, found several GitHub repos claiming to have one, but couldn't verify their contents were real rather than search-noise -- so rather than wire your project to an unverified data source, I built the infrastructure instead:
+
+- **`GET /api/word-vocabulary`** -- actually serves the 100 staged WLASL glosses now (`help`, `water`, `yes`, `mother`, ...), so that dead JSON file is doing something.
+- **`scripts/extract_word_landmarks.py`** -- turns short video clips (one subfolder per word, any number of clips inside) into fixed-length pooled feature descriptors (mean/std/min/max across sampled frames + a first-to-last delta, capturing motion without needing an LSTM). I built and ran a synthetic smoke test (fake clips assembled from existing letter images, not real signs) to verify the whole extract → pool → save pipeline works mechanically; I deleted that synthetic data before committing so the repo doesn't ship a model trained on fake data.
+- **`scripts/train_word_model.py`** -- same lightweight sklearn MLP approach as the letter model. Found and fixed a real edge case while testing: sklearn's stratified split needs at least `ceil(1/test_size)` = 5 samples per class, not the 2 I originally assumed, or it throws rather than silently misbehaving -- now enforced with a clear error message instead.
+- **`POST /api/recognize-word`** and **`GET /api/word-model-status`** -- a complete serving path, returning a clear "not trained yet" error (not a wrong guess) until a real model exists.
+- **Live Translate's "Record word" button** -- press-and-hold to record a short clip of a whole sign, auto-hidden with an explanatory note until `word-model-status` reports `trained: true`.
+
+**To actually get whole words working**, on a machine with normal internet access:
+1. Get real clips -- either run `scripts/download_wlasl_clips.py` (American Sign Language, ~2,000 URLs already staged), or record your own 5+ clips per word (better if your target is Indian Sign Language, given the ASL/ISL mismatch already noted below).
+2. Organize them as `datasets/sign_language/word_clips/<word>/clip1.mp4, clip2.mp4, ...`.
+3. Run `python scripts/extract_word_landmarks.py` then `python scripts/train_word_model.py`.
+4. Restart the server -- Live Translate's word-recording button will appear automatically.
 
 ## Architecture
 
@@ -100,6 +117,9 @@ Each pipe maps 1:1 to a FastAPI endpoint:
 | `POST /api/read-text` | Image → OCR → text → (optional) TTS |
 | `POST /api/speech-to-text` | Audio → Whisper → text |
 | `POST /api/recognize-sign` | Image → MediaPipe/HOG → MLP → sign → (optional) TTS. `log=false` (used by Live Translate) skips the history write. |
+| `POST /api/recognize-word` | Video clip → per-frame features → pooled descriptor → MLP → word → (optional) TTS. Returns a clear 503 until a word model is trained (see "Whole-word signs" below). |
+| `GET /api/word-model-status` | `{trained: true/false}` -- lets the frontend show/hide word-sign UI honestly |
+| `GET /api/word-vocabulary` | The 100 staged WLASL glosses, as a suggested word list to record or download clips for |
 | `POST /api/text-to-speech` | text → audio |
 | `POST /api/communicate/hearing-to-deaf` | Audio → text (for a deaf participant to read) |
 | `POST /api/communicate/deaf-to-hearing` | Sign image → text + audio (for a hearing participant) |
@@ -153,6 +173,8 @@ outputs/                     Runtime-generated TTS audio + uploads (gitignored)
 | `scripts/explore_wlasl.py` | Parses `WLASL_v0.3.json` (re-download it if you want to regenerate the list -- see the script's docstring), ranks glosses, writes the WLASL100 class list + a CSV of clip URLs. |
 | `scripts/download_wlasl_clips.py` | Optional: actually downloads WLASL video clips (needs unrestricted internet, run on your own machine). |
 | `scripts/generate_ocr_samples.py` | Renders 6 clean sign/label images for a fair OCR eval set. |
+| `scripts/extract_word_landmarks.py` | Turns word-sign video clips (`datasets/sign_language/word_clips/<word>/*.mp4`, you supply these) into pooled per-clip feature descriptors. |
+| `scripts/train_word_model.py` | Trains the word-level MLP on those descriptors; same architecture/output convention as `train_sign_model.py`. |
 | `scripts/demo_pipeline.py` | End-to-end offline smoke test (see below). |
 
 ## What was actually executed here

@@ -219,6 +219,14 @@
                 <button class="btn btn-primary" id="sentence-speak" type="button">&#128264; Speak</button>
               </div>
               <label class="toggle"><input type="checkbox" id="auto-speak" checked/><span class="track"></span>Speak automatically after a short pause</label>
+
+              <div class="word-mode-box" id="word-mode-box" hidden>
+                <h4>Whole-word signs</h4>
+                <p class="hint">Hold <strong>Record word</strong>, sign the whole word, then release.</p>
+                <button class="btn btn-ghost" id="word-record-btn" type="button">&#9679; Record word</button>
+                <span class="word-mode-result" id="word-mode-result"></span>
+              </div>
+              <p class="hint" id="word-mode-unavailable">Whole-word signs: not trained yet (letters above work now) &mdash; see the README's "Live Translate" section for how to add word-level training data.</p>
             </div>
 
             <!-- Speech -> Captions -->

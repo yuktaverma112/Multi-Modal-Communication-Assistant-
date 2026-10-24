@@ -501,6 +501,12 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 
 .fallback-note { border-top: 1px solid var(--hairline); padding-top: 14px; }
 
+.word-mode-box { border-top: 1px solid var(--hairline); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.word-mode-box h4 { margin: 0; font-size: var(--step--1); color: var(--text-muted); font-weight: 600; }
+.word-mode-result { font-size: var(--step--1); color: var(--text-muted); }
+#word-mode-unavailable { border-top: 1px solid var(--hairline); padding-top: 14px; margin: 0; }
+#word-record-btn.recording { border-color: var(--live); color: var(--live); }
+
 /* =========================================================
    Communication view: transcript feed
    ========================================================= */

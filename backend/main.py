@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import TTS_OUTPUT_DIR
 from backend.database.database import init_db
-from backend.api import object_detection, ocr, speech, sign_language, communication, history
+from backend.api import object_detection, ocr, speech, sign_language, word_sign, communication, history
 
 
 @asynccontextmanager
@@ -49,6 +49,7 @@ app.include_router(object_detection.router)
 app.include_router(ocr.router)
 app.include_router(speech.router)
 app.include_router(sign_language.router)
+app.include_router(word_sign.router)
 app.include_router(communication.router)
 app.include_router(history.router)
 

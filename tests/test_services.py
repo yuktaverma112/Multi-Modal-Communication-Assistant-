@@ -84,6 +84,46 @@ def test_recognize_sign_log_false_skips_history():
         assert after == before  # unchanged -- the poll was not logged
 
 
+def test_word_model_status_reflects_reality():
+    """No word-level model ships with this project (see README) -- this
+    must report trained:false, not silently claim otherwise."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/word-model-status")
+        assert r.status_code == 200
+        assert r.json()["data"]["trained"] is False
+
+
+def test_word_vocabulary_serves_the_staged_glosses():
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/word-vocabulary")
+        assert r.status_code == 200
+        glosses = r.json()["data"]["glosses"]
+        assert len(glosses) == 100
+        assert "help" in glosses
+
+
+def test_recognize_word_without_a_trained_model_fails_clearly():
+    """Must return a clear, actionable error -- never a silent wrong
+    guess -- when no word model has been trained yet."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    with TestClient(app) as client:
+        with open(sample, "rb") as f:
+            r = client.post("/api/recognize-word", files={"file": ("clip.webm", f, "video/webm")})
+        assert r.status_code == 200  # our {code, message, data} envelope, not an HTTP error
+        body = r.json()
+        assert body["code"] == 503
+        assert "not been trained" in body["message"] or "has been trained" in body["message"]
+
+
 def test_history_log_endpoint_records_a_committed_event():
     """Live Translate logs one meaningful event (a spoken sentence, a
     finished caption session) via this endpoint instead of every poll."""
