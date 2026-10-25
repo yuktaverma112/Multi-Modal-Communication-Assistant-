@@ -24,5 +24,6 @@ datasets/sign_language/WLASL100/videos/
 
 # OS / editor cruft
 .DS_Store
-.vscode/
 .idea/
+# .vscode/ is intentionally NOT ignored -- launch.json, settings.json and
+# extensions.json are shared project config, checked in on purpose.

@@ -55,6 +55,16 @@ python scripts/demo_pipeline.py
 pytest -q
 ```
 
+### Running it in VS Code
+
+`.vscode/` ships with this project (checked in on purpose, not personal editor state) and gives you:
+- **Run and Debug panel → "Debug server (breakpoints work, no auto-reload)"** -- press F5, set breakpoints anywhere in `backend/`, they'll actually hit. (`--reload` spawns a separate subprocess VS Code's debugger can't see into, which is why this config skips it.)
+- **"Run server (auto-reload, no breakpoints)"** -- same as the `uvicorn --reload` command above, for normal day-to-day use where you want the server to pick up file changes automatically.
+- **"Run current test file (pytest)"** -- debug whichever test file you have open.
+- The Testing panel (flask icon in the sidebar) auto-discovers everything in `tests/` once you've selected the right interpreter.
+
+First open: Ctrl+Shift+P → "Python: Select Interpreter" → pick the one inside `.venv` (Windows: `.venv\Scripts\python.exe`, Mac/Linux: `.venv/bin/python`; `.vscode/settings.json` defaults to the Windows path -- change it if you're on Mac/Linux, or just select the right one manually, which overrides the default).
+
 ## Live Translate: real-time sign-to-speech and speech-to-captions
 
 This is the flagship feature: a continuous, live session using your camera, microphone and speaker instead of one-photo-at-a-time snapshots. Open the "Live Translate" view (new sidebar entry, also featured first on the dashboard).
