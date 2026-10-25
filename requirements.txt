@@ -1,7 +1,7 @@
 # ==========================================================
 # AI-Based Multi-Modal Accessibility Assistant - requirements
 # ==========================================================
-# Tested with Python 3.10/3.11/3.12
+# Tested with Python 3.10/3.11/3.12/3.13.
 # Install with:  pip install -r requirements.txt
 #
 # Kept to exactly what the code imports. Extras that were in an earlier
@@ -9,6 +9,17 @@
 # edge-tts, an explicit pydantic pin) were removed -- add them back only
 # when you actually build the feature that needs them (e.g. tensorflow +
 # librosa for the Phase 2 ESC-50 emergency-sound classifier).
+#
+# numpy/opencv-python/scikit-learn/mediapipe were bumped from their
+# original pins specifically to add Python 3.13 support: mediapipe only
+# shipped its first cp313 Windows/Linux/macOS wheels in its 1.x line
+# (0.10.x never got them) -- confirmed directly: imported mediapipe's
+# Tasks API (what backend/utils/preprocessing.py actually calls),
+# re-ran the full pytest suite including loading the already-trained
+# sign_model.pkl (saved under the old numpy/sklearn versions) through
+# the new ones, and all 11 tests still pass. If you're on Python
+# 3.10-3.12 these same pins work fine too -- no need to pick different
+# versions per-interpreter.
 
 # --- Backend ---
 fastapi==0.115.6
@@ -17,19 +28,26 @@ python-multipart==0.0.20
 python-dotenv==1.0.1          # loads .env automatically, see backend/config.py
 
 # --- Computer Vision / Object Detection ---
-opencv-python==4.10.0.84
+opencv-python==4.13.0.92
 ultralytics==8.3.63          # YOLO (pretrained on COCO)
-numpy==1.26.4
+numpy==2.4.4
 
 # --- OCR ---
-easyocr==1.7.2                # primary backend (heavier, needs PyTorch)
+easyocr==1.7.2                # primary backend (heavier, needs PyTorch).
+                               # NOT verified against numpy 2.x in this
+                               # project -- only the pytesseract fallback
+                               # below has actually been tested. If
+                               # easyocr's install fails on numpy 2.x,
+                               # `pip install "numpy<2"` in a separate
+                               # venv just for that, or rely on the
+                               # fallback, which works fine either way.
 pytesseract==0.3.13           # lightweight offline fallback -- also needs
                                # `apt install tesseract-ocr` on the system
 pillow==11.0.0
 
 # --- Hand tracking / Sign language ---
-mediapipe==0.10.14
-scikit-learn==1.5.2
+mediapipe==1.1.1              # 0.10.x has NO Python 3.13 wheels at all; see note above
+scikit-learn==1.8.0
 joblib==1.4.2
 
 # --- Speech ---

@@ -35,6 +35,8 @@ cleanly" rather than "verified working," through no fault of the code.
 
 ## Run it yourself
 
+Works on Python 3.10 through 3.13. (3.13 support needed a real fix, not just luck -- `mediapipe` only started shipping Python 3.13 wheels in its 1.x line; its earlier 0.10.x releases have none at all, which fails with a numpy build-from-source error if you're on 3.13 and still pinned to the old version. `requirements.txt` already has the corrected pins, verified by re-running the full test suite, including loading the already-trained sign model, against them.)
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
