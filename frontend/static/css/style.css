@@ -350,6 +350,7 @@ button, input, select { font-family: inherit; }
 .dropzone:hover, .dropzone.drag-over { border-color: var(--signal); color: var(--signal); }
 .dropzone input { display: none; }
 .dropzone .filename { color: var(--text); font-weight: 600; }
+.dropzone:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .btn {
   font-family: 'Space Grotesk', sans-serif;
@@ -407,6 +408,9 @@ button, input, select { font-family: inherit; }
 .rank-list .rank-pct { color: var(--text-muted); width: 4ch; text-align: right; }
 
 audio { width: 100%; margin-top: 10px; height: 36px; }
+.pending-preview { max-width: 100%; }
+.pending-image-preview { display: block; max-width: min(100%, 320px); max-height: 240px; object-fit: contain; border: 1px solid var(--hairline); border-radius: 10px; background: #000; }
+.pending-image-preview[hidden], .pending-preview[hidden] { display: none; }
 
 /* =========================================================
    Live Translate view
@@ -414,7 +418,7 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 
 .live-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   gap: 20px;
   align-items: start;
 }
@@ -455,7 +459,7 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 .live-video-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 5 / 4;
   background: #000;
   border-radius: 10px;
   overflow: hidden;
@@ -464,11 +468,12 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 .guide-box {
   position: absolute;
   top: 50%; left: 50%;
-  width: 46%; height: 62%;
+  width: 76%; height: 82%;
   transform: translate(-50%, -50%);
-  border: 2.5px dashed rgba(255,255,255,0.75);
+  border: 3px dashed rgba(255,255,255,0.9);
   border-radius: 12px;
   pointer-events: none;
+  box-shadow: 0 0 0 999px rgba(0,0,0,0.16);
 }
 .live-status-chip {
   position: absolute;
@@ -483,6 +488,27 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 .candidate-row { display: flex; align-items: center; gap: 10px; font-size: var(--step--1); color: var(--text-muted); }
 .candidate-row #candidate-label { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--text); min-width: 1.4ch; }
 .candidate-track { max-width: 160px; }
+
+.recognition-visuals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.recognition-visual {
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--bg);
+}
+.recognition-visual h4 { margin: 0; font-size: var(--step--1); }
+.recognition-visual .hint { min-height: 2.5em; margin-top: 4px; font-size: 0.78rem; }
+#hand-pattern-svg, .confidence-chart { display: block; width: 100%; height: 112px; }
+#hand-pattern-lines polyline { fill: none; stroke: var(--signal); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+#hand-pattern-lines .palm-connection { stroke: var(--text-muted); stroke-width: 1; }
+#hand-pattern-points circle { fill: var(--pulse); stroke: var(--bg); stroke-width: 0.6; }
+.confidence-gridline { fill: none; stroke: var(--hairline); stroke-width: 1; }
+#confidence-line { fill: none; stroke: var(--pulse); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
 .sentence-box, .caption-box {
   min-height: 90px;
@@ -501,6 +527,10 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
 
 .fallback-note { border-top: 1px solid var(--hairline); padding-top: 14px; }
 
+@media (max-width: 560px) {
+  .recognition-visuals { grid-template-columns: 1fr; }
+}
+
 .word-mode-box { border-top: 1px solid var(--hairline); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .word-mode-box h4 { margin: 0; font-size: var(--step--1); color: var(--text-muted); font-weight: 600; }
 .word-mode-result { font-size: var(--step--1); color: var(--text-muted); }
@@ -512,14 +542,21 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
    ========================================================= */
 
 .transcript { display: flex; flex-direction: column; gap: 10px; min-height: 60px; padding: 4px 0; }
+.transcript:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 8px; }
 .transcript-empty { color: var(--text-muted); font-size: var(--step--1); font-style: italic; }
 
 .bubble { max-width: 78%; padding: 12px 16px; border-radius: 14px; font-size: var(--step-0); }
 .bubble.from-hearing { align-self: flex-start; background: rgba(52, 87, 255, 0.14); border: 1px solid rgba(52, 87, 255, 0.3); border-bottom-left-radius: 4px; }
 .bubble.from-deaf { align-self: flex-end; background: rgba(23, 185, 120, 0.14); border: 1px solid rgba(23, 185, 120, 0.3); border-bottom-right-radius: 4px; }
 .bubble .bubble-meta { display: block; font-size: var(--step--1); color: var(--text-muted); margin-bottom: 4px; font-family: 'Space Grotesk', sans-serif; }
+.bubble .bubble-time { float: right; color: var(--text-muted); font-size: 0.75rem; font-weight: 400; }
 .bubble audio { margin-top: 8px; }
 
+.conversation-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.conversation-head h3 { font-size: var(--step-1); }
+.conversation-head .hint { margin: 4px 0 0; color: var(--text-muted); font-size: var(--step--1); }
+.hearing-live-box { min-height: 72px; }
+.comm-controls .hint { margin: 0; color: var(--text-muted); font-size: var(--step--1); }
 .comm-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .comm-controls .side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
 .comm-controls .side h4 { margin: 0; font-size: var(--step--1); color: var(--text-muted); font-weight: 600; }
@@ -552,4 +589,8 @@ audio { width: 100%; margin-top: 10px; height: 36px; }
   .launch-grid { grid-template-columns: 1fr; }
   .dash-hero { flex-direction: column; align-items: flex-start; }
   .bubble { max-width: 92%; }
+}
+
+@media (max-width: 560px) {
+  .conversation-head { align-items: flex-start; flex-direction: column; }
 }

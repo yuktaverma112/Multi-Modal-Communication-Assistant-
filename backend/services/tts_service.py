@@ -23,8 +23,9 @@ from __future__ import annotations
 import os
 import uuid
 
+from backend.config import TTS_OUTPUT_DIR
 
-AUDIO_OUTPUT_DIR = os.getenv("TTS_OUTPUT_DIR", "outputs/tts")
+AUDIO_OUTPUT_DIR = os.path.abspath(os.getenv("TTS_OUTPUT_DIR", TTS_OUTPUT_DIR))
 
 
 class TTSService:

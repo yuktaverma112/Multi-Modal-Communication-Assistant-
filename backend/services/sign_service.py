@@ -63,7 +63,11 @@ class SignService:
         "extraction_method": "landmarks"|"hog"}."""
         self._ensure_loaded()
 
-        feats, method = extract_features(image, prefer_landmarks=True)
+        feats, method, landmarks = extract_features(
+            image,
+            prefer_landmarks=True,
+            include_landmarks=True,
+        )
         expected_dim = self._scaler.mean_.shape[0]
         if feats.shape[0] != expected_dim:
             # Model was trained on HOG (or landmarks) only -- force the
@@ -72,6 +76,7 @@ class SignService:
             if expected_dim == 63:
                 feats = extract_hand_landmarks(image)
                 method = "landmarks"
+                landmarks = None
                 if feats is None:
                     return {
                         "prediction": None,
@@ -99,6 +104,11 @@ class SignService:
             "confidence": top_k_list[0]["confidence"],
             "top_k": top_k_list,
             "extraction_method": method,
+            "hand_landmarks": (
+                np.round(landmarks[:, :2], 4).tolist()
+                if landmarks is not None
+                else []
+            ),
         }
 
 

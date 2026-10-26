@@ -7,8 +7,11 @@ environment (no ultralytics/whisper download required). Run with:
     pytest -q
 """
 import glob
+import io
 import os
+import subprocess
 import sys
+import wave
 
 import cv2
 import pytest
@@ -16,6 +19,19 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
+
+
+def test_whisper_ffmpeg_is_available_without_system_install():
+    from backend.services.whisper_service import _ensure_ffmpeg_available
+
+    _ensure_ffmpeg_available()
+    result = subprocess.run(
+        ["ffmpeg", "-version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "ffmpeg version" in result.stdout.lower()
 
 
 def test_preprocessing_hog_features_shape():
@@ -37,6 +53,8 @@ def test_sign_service_predicts_known_class():
     assert result["prediction"] is not None
     assert 0.0 <= result["confidence"] <= 1.0
     assert len(result["top_k"]) == 3
+    assert len(result["hand_landmarks"]) in (0, 21)
+    assert all(len(point) == 2 for point in result["hand_landmarks"])
 
 
 def test_ocr_service_reads_clean_synthetic_sign():
@@ -51,11 +69,23 @@ def test_ocr_service_reads_clean_synthetic_sign():
 
 
 def test_tts_service_writes_nonempty_wav(tmp_path):
+    from fastapi.testclient import TestClient
+    from backend.config import TTS_OUTPUT_DIR
+    from backend.main import app
     from backend.services.tts_service import tts_service
 
     path = tts_service.speak_to_file("test message")
-    assert os.path.exists(path)
-    assert os.path.getsize(path) > 0
+    try:
+        assert os.path.exists(path)
+        assert os.path.getsize(path) > 0
+        assert os.path.dirname(os.path.abspath(path)) == os.path.abspath(TTS_OUTPUT_DIR)
+        with TestClient(app) as client:
+            response = client.get(f"/media/{os.path.basename(path)}")
+            assert response.status_code == 200
+            assert response.content[:4] == b"RIFF"
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
 
 
 def test_api_health():
@@ -125,6 +155,78 @@ def test_word_vocabulary_serves_the_staged_glosses():
         glosses = r.json()["data"]["glosses"]
         assert len(glosses) == 100
         assert "help" in glosses
+
+
+def test_hearing_and_communication_actions_complete(monkeypatch):
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    from backend.services.sign_service import sign_service
+    from backend.services.whisper_service import whisper_service
+
+    audio_file = io.BytesIO()
+    with wave.open(audio_file, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(b"\0\0" * 1600)
+    audio_bytes = audio_file.getvalue()
+    image_path = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    with open(image_path, "rb") as image_file:
+        image_bytes = image_file.read()
+
+    monkeypatch.setattr(
+        whisper_service,
+        "transcribe",
+        lambda path, language="en": {"text": " hello there ", "language": language},
+    )
+    monkeypatch.setattr(
+        sign_service,
+        "predict",
+        lambda image: {
+            "prediction": "A",
+            "confidence": 0.95,
+            "top_k": [{"label": "A", "confidence": 0.95}],
+        },
+    )
+
+    generated_audio = []
+    try:
+        with TestClient(app) as client:
+            caption = client.post(
+                "/api/speech-to-text",
+                files={"file": ("speech.wav", audio_bytes, "audio/wav")},
+            )
+            assert caption.json()["data"]["text"] == " hello there "
+
+            shared_caption = client.post(
+                "/api/communicate/hearing-to-deaf",
+                files={"file": ("speech.wav", audio_bytes, "audio/wav")},
+            )
+            assert shared_caption.json()["data"]["text"] == " hello there "
+
+            sign = client.post(
+                "/api/communicate/deaf-to-hearing",
+                files={"file": ("sign.jpg", image_bytes, "image/jpeg")},
+            )
+            assert sign.json()["data"]["text"] == "A"
+            sign_audio = sign.json()["data"]["audio_path"]
+            generated_audio.append(sign_audio)
+            assert client.get(f"/media/{os.path.basename(sign_audio)}").status_code == 200
+
+            typed = client.post("/api/communicate/type-to-hearing", data={"text": "  Need help  "})
+            assert typed.json()["data"]["text"] == "Need help"
+            typed_audio = typed.json()["data"]["audio_path"]
+            generated_audio.append(typed_audio)
+            assert client.get(f"/media/{os.path.basename(typed_audio)}").status_code == 200
+            speech_history = client.get("/api/history?modality=speech").json()["data"]
+            assert any(row["result_text"] == "Need help" for row in speech_history)
+
+            blank = client.post("/api/communicate/type-to-hearing", data={"text": "   "})
+            assert blank.json()["code"] == 400
+    finally:
+        for path in generated_audio:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 def test_recognize_word_without_a_trained_model_fails_clearly():

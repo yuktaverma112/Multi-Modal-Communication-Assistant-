@@ -20,9 +20,9 @@ async def speech_to_text(file: UploadFile = File(...), db: Session = Depends(get
         result = whisper_service.transcribe(path)
     except Exception as e:
         return error(
-            f"Whisper backend not available ({e}). Run "
-            f"`pip install openai-whisper` (needs ffmpeg + ~140MB model download "
-            f"on first use).",
+            f"Speech recognition unavailable ({e}). Install project dependencies "
+            f"with `python -m pip install -r requirements.txt`; the first run "
+            f"needs internet access to download the Whisper model.",
             code=503,
         )
     finally:

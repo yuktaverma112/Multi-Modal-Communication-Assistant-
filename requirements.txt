@@ -51,7 +51,8 @@ scikit-learn==1.8.0
 joblib==1.4.2
 
 # --- Speech ---
-openai-whisper==20240930
+openai-whisper==20250625
+imageio-ffmpeg==0.6.0        # bundles ffmpeg so Whisper works on Windows without a separate install
 
 # --- Text-to-Speech ---
 pyttsx3==2.98

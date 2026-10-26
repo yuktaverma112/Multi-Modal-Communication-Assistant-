@@ -190,7 +190,7 @@
                 <h3>Sign &rarr; Speech</h3>
                 <span class="live-indicator" id="sign-live-indicator"><span class="live-dot"></span>off</span>
               </div>
-              <p class="hint">Hold your hand inside the guide box. Hold a letter steady for a moment to add it.</p>
+              <p class="hint">Keep your hand large and centered in the guide area. A steady letter is added automatically.</p>
 
               <div class="live-video-wrap">
                 <video id="live-video" autoplay playsinline muted></video>
@@ -200,6 +200,25 @@
 
               <div class="input-row">
                 <button class="btn btn-primary" id="live-cam-toggle" type="button">Start camera</button>
+              </div>
+
+              <div class="recognition-visuals">
+                <section class="recognition-visual" aria-labelledby="hand-pattern-title">
+                  <h4 id="hand-pattern-title">Captured hand pattern</h4>
+                  <p class="hint" id="hand-pattern-status" aria-live="polite">Show a hand in the guide area.</p>
+                  <svg id="hand-pattern-svg" viewBox="0 0 100 100" role="img" aria-label="Hand landmark line diagram">
+                    <g id="hand-pattern-lines"></g>
+                    <g id="hand-pattern-points"></g>
+                  </svg>
+                </section>
+                <section class="recognition-visual" aria-labelledby="confidence-chart-title">
+                  <h4 id="confidence-chart-title">Recognition confidence</h4>
+                  <p class="hint" id="confidence-chart-status" aria-live="polite">Waiting for camera samples.</p>
+                  <svg class="confidence-chart" viewBox="0 0 240 90" role="img" aria-label="Recent sign recognition confidence">
+                    <path class="confidence-gridline" d="M8 12H232 M8 45H232 M8 78H232"></path>
+                    <polyline id="confidence-line" points=""></polyline>
+                  </svg>
+                </section>
               </div>
 
               <div class="candidate-row" id="candidate-row" hidden>
@@ -316,16 +335,24 @@
 
           <div class="tool">
             <h3>Speech to captions</h3>
-            <p class="hint">Record someone speaking, or upload an audio clip.</p>
+            <p class="hint">Caption speech live in a supported browser, or record/upload a clip for transcription.</p>
+            <div class="caption-box hearing-live-box" id="hearing-live-box" aria-live="polite">
+              <span class="sentence-placeholder">Live captions will appear here.</span>
+            </div>
             <div class="input-row">
+              <button class="btn btn-primary accent-pulse" id="hearing-live-toggle" type="button">Start live captions</button>
               <button class="btn btn-ghost" id="speech-record-btn" type="button">Record audio</button>
               <label class="dropzone" id="speech-drop" tabindex="0" style="flex:1">
                 <span id="speech-filename">Or drop / choose an audio file</span>
                 <input type="file" id="speech-file" accept="audio/*" />
               </label>
             </div>
+            <p class="hint" id="hearing-live-note">Live captions use your browser’s speech service; microphone permission is required.</p>
+            <audio class="pending-preview" id="speech-preview" controls hidden></audio>
             <div class="input-row">
-              <button class="btn btn-primary accent-pulse" id="speech-btn" type="button">Transcribe</button>
+              <button class="btn btn-primary accent-pulse" id="speech-btn" type="button" disabled>Transcribe recording</button>
+              <button class="btn btn-ghost" id="speech-clear-file" type="button" data-clear-pending="speech" disabled>Remove recording</button>
+              <button class="btn btn-ghost" id="hearing-live-clear" type="button">Clear captions</button>
             </div>
             <div class="result" id="speech-result"></div>
           </div>
@@ -347,9 +374,11 @@
                 <button class="btn btn-ghost" id="sign-cam-close" type="button">Close camera</button>
               </div>
             </div>
+            <img class="pending-image-preview" id="sign-preview" alt="Selected sign photo preview" hidden />
             <div class="input-row">
               <label class="toggle"><input type="checkbox" id="sign-speak"/><span class="track"></span>Speak the result</label>
-              <button class="btn btn-primary accent-pulse" id="sign-btn" type="button">Recognize sign</button>
+              <button class="btn btn-primary accent-pulse" id="sign-btn" type="button" disabled>Recognize sign</button>
+              <button class="btn btn-ghost" id="sign-clear-file" type="button" data-clear-pending="sign" disabled>Remove photo</button>
             </div>
             <div class="result" id="sign-result"></div>
           </div>
@@ -360,8 +389,14 @@
         <section class="view" id="view-comm">
 
           <div class="tool">
-            <h3>Conversation</h3>
-            <div class="transcript" id="transcript">
+            <div class="conversation-head">
+              <div>
+                <h3>Conversation</h3>
+                <p class="hint" id="conversation-status" aria-live="polite">Choose a way to communicate below. Your messages appear here.</p>
+              </div>
+              <button class="btn btn-ghost" id="conversation-clear" type="button">Clear conversation</button>
+            </div>
+            <div class="transcript" id="transcript" role="log" aria-live="polite" aria-relevant="additions text" tabindex="0">
               <p class="transcript-empty">Nothing said yet — speak, sign, or type below to start.</p>
             </div>
           </div>
@@ -369,15 +404,21 @@
           <div class="comm-controls">
             <div class="side">
               <h4>Hearing participant</h4>
+              <p class="hint">Record or choose speech. It will be transcribed into the shared conversation.</p>
               <button class="btn btn-primary" id="h2d-record-btn" type="button">Record speech</button>
               <label class="dropzone" id="h2d-drop" tabindex="0">
                 <span id="h2d-filename">Or drop / choose an audio file</span>
                 <input type="file" id="h2d-file" accept="audio/*" />
               </label>
-              <button class="btn btn-ghost" id="h2d-btn" type="button">Send to conversation</button>
+              <audio class="pending-preview" id="h2d-preview" controls hidden></audio>
+              <div class="input-row">
+                <button class="btn btn-primary" id="h2d-btn" type="button" disabled>Transcribe &amp; send</button>
+                <button class="btn btn-ghost" id="h2d-clear-file" type="button" data-clear-pending="h2d" disabled>Remove audio</button>
+              </div>
             </div>
             <div class="side">
               <h4>Deaf / hard-of-hearing participant</h4>
+              <p class="hint">Sign with the camera or choose a hand-sign photo. Recognized text can be played aloud.</p>
               <button class="btn btn-primary accent-pulse" id="d2h-cam-btn" type="button">Use camera to sign</button>
               <div class="camera-box" id="d2h-camera">
                 <video id="d2h-video" autoplay playsinline></video>
@@ -390,9 +431,13 @@
                 <span id="d2h-filename">Or drop / choose a photo</span>
                 <input type="file" id="d2h-file" accept="image/*" />
               </label>
-              <button class="btn btn-ghost" id="d2h-btn" type="button">Send photo to conversation</button>
+              <img class="pending-image-preview" id="d2h-preview" alt="Selected hand-sign photo preview" hidden />
+              <div class="input-row">
+                <button class="btn btn-primary accent-pulse" id="d2h-btn" type="button" disabled>Recognize &amp; send sign</button>
+                <button class="btn btn-ghost" id="d2h-clear-file" type="button" data-clear-pending="d2h" disabled>Remove photo</button>
+              </div>
               <div class="type-row">
-                <input type="text" id="type-input" placeholder="Or type a message&hellip;" />
+                <input type="text" id="type-input" aria-label="Message for the hearing participant" placeholder="Or type a message&hellip;" />
                 <button class="btn btn-ghost" id="type-btn" type="button">Send</button>
               </div>
             </div>

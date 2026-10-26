@@ -109,6 +109,18 @@ def extract_hand_landmarks(image: np.ndarray) -> np.ndarray | None:
     """Return a 63-d feature vector (21 landmarks x xyz) normalized
     relative to the wrist, or None if no hand was detected / MediaPipe
     is unavailable."""
+    points = extract_hand_landmark_points(image)
+    if points is None:
+        return None
+
+    coords = points.copy()
+    coords -= coords[0].copy()
+    max_val = np.max(np.abs(coords)) or 1.0
+    return (coords / max_val).flatten()
+
+
+def extract_hand_landmark_points(image: np.ndarray) -> np.ndarray | None:
+    """Return the detected hand's 21 image-relative landmarks for visualization."""
     import mediapipe as mp
 
     landmarker = _get_landmarker()
@@ -123,12 +135,7 @@ def extract_hand_landmarks(image: np.ndarray) -> np.ndarray | None:
         return None
 
     lm = result.hand_landmarks[0]
-    coords = np.array([[p.x, p.y, p.z] for p in lm], dtype=np.float32)
-    wrist = coords[0].copy()
-    coords -= wrist  # translate so wrist is the origin
-    max_val = np.max(np.abs(coords)) or 1.0
-    coords /= max_val  # scale-normalize
-    return coords.flatten()  # shape (63,)
+    return np.array([[p.x, p.y, p.z] for p in lm], dtype=np.float32)
 
 
 def extract_hog_features(image: np.ndarray) -> np.ndarray:
@@ -141,18 +148,35 @@ def extract_hog_features(image: np.ndarray) -> np.ndarray:
     return features.flatten()
 
 
-def extract_features(image: np.ndarray, prefer_landmarks: bool = True):
+def extract_features(
+    image: np.ndarray,
+    prefer_landmarks: bool = True,
+    include_landmarks: bool = False,
+):
     """Unified entry point used by both training scripts and the live
     sign_service. Returns (feature_vector, method) where method is
-    'landmarks' or 'hog'."""
+    'landmarks' or 'hog'. When requested, also returns image-relative
+    hand landmarks for the live recognition diagram."""
+    points = None
     if prefer_landmarks:
         try:
-            feats = extract_hand_landmarks(image)
+            points = extract_hand_landmark_points(image)
+            feats = None
+            if points is not None:
+                coords = points.copy()
+                coords -= coords[0].copy()
+                max_val = np.max(np.abs(coords)) or 1.0
+                feats = (coords / max_val).flatten()
             if feats is not None:
+                if include_landmarks:
+                    return feats, "landmarks", points
                 return feats, "landmarks"
         except Exception:
             pass
-    return extract_hog_features(image), "hog"
+    feats = extract_hog_features(image)
+    if include_landmarks:
+        return feats, "hog", points
+    return feats, "hog"
 
 
 def read_image(path: str) -> np.ndarray:

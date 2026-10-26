@@ -34,7 +34,12 @@ async def hearing_to_deaf(file: UploadFile = File(...), db: Session = Depends(ge
     try:
         result = whisper_service.transcribe(path)
     except Exception as e:
-        return error(f"Whisper backend not available ({e}).", code=503)
+        return error(
+            f"Speech recognition unavailable ({e}). Install project dependencies "
+            f"with `python -m pip install -r requirements.txt`; the first run "
+            f"needs internet access to download the Whisper model.",
+            code=503,
+        )
     finally:
         cleanup(path)
     crud.log_prediction(db, "speech", result["text"])
@@ -60,9 +65,13 @@ async def deaf_to_hearing(file: UploadFile = File(...), db: Session = Depends(ge
 
 
 @router.post("/type-to-hearing")
-async def type_to_hearing(text: str = Form(...)):
+async def type_to_hearing(text: str = Form(...), db: Session = Depends(get_db)):
     """Fallback direction for when sign recognition isn't confident
     enough: the deaf/hard-of-hearing user types instead, still gets
     spoken aloud to the hearing participant."""
+    text = text.strip()
+    if not text:
+        return error("Type a message before sending.")
     audio_path = tts_service.speak_to_file(text)
+    crud.log_prediction(db, "speech", text)
     return ok({"text": text, "audio_path": audio_path})

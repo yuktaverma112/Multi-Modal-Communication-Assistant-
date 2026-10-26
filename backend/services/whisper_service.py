@@ -17,10 +17,42 @@ access so the model checkpoint can download.
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
 import threading
 from typing import Dict
 
 MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
+_FFMPEG_LOCK = threading.Lock()
+
+
+def _ensure_ffmpeg_available() -> None:
+    """Expose imageio-ffmpeg's bundled executable under Whisper's expected name."""
+    import imageio_ffmpeg
+
+    source = imageio_ffmpeg.get_ffmpeg_exe()
+    ffmpeg_dir = os.path.join(tempfile.gettempdir(), "ai-multimodal-assistant-ffmpeg")
+    executable = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    destination = os.path.join(ffmpeg_dir, executable)
+
+    with _FFMPEG_LOCK:
+        os.makedirs(ffmpeg_dir, exist_ok=True)
+        if (
+            not os.path.isfile(destination)
+            or os.path.getsize(destination) != os.path.getsize(source)
+        ):
+            temporary = f"{destination}.{os.getpid()}.tmp"
+            try:
+                shutil.copy2(source, temporary)
+                os.replace(temporary, destination)
+            finally:
+                if os.path.exists(temporary):
+                    os.remove(temporary)
+
+        paths = os.environ.get("PATH", "").split(os.pathsep)
+        normalized_dir = os.path.normcase(os.path.abspath(ffmpeg_dir))
+        if normalized_dir not in {os.path.normcase(os.path.abspath(path)) for path in paths if path}:
+            os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
 
 class WhisperService:
@@ -43,6 +75,7 @@ class WhisperService:
         """audio_path: path to a wav/mp3/m4a file on disk (see
         backend/utils/audio.py for saving an uploaded file to a temp
         path first). Returns {"text": ..., "language": ...}."""
+        _ensure_ffmpeg_available()
         self._ensure_loaded()
         result = self._model.transcribe(audio_path, language=language)
         return {"text": result["text"].strip(), "language": result.get("language", language)}
