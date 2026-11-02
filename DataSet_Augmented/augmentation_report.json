@@ -1,0 +1,122 @@
+{
+  "start_time": "2026-11-02 21:00:33",
+  "source_dir": "C:\\Users\\aaroh\\Downloads\\Multi-Modal-Communication-Assistant--main\\Multi-Modal-Communication-Assistant--main\\DataSet",
+  "output_dir": "C:\\Users\\aaroh\\Downloads\\Multi-Modal-Communication-Assistant--main\\Multi-Modal-Communication-Assistant--main\\DataSet_Augmented",
+  "mode": "multiplier",
+  "multiplier": 5,
+  "target_count": null,
+  "intensity": "moderate",
+  "allow_horizontal_flip": false,
+  "classes": {
+    "A": {
+      "original_count": 10,
+      "augmented_count": 50,
+      "final_count": 60
+    },
+    "B": {
+      "original_count": 9,
+      "augmented_count": 45,
+      "final_count": 54
+    },
+    "Book": {
+      "original_count": 8,
+      "augmented_count": 40,
+      "final_count": 48
+    },
+    "C": {
+      "original_count": 10,
+      "augmented_count": 50,
+      "final_count": 60
+    },
+    "Congratulations": {
+      "original_count": 12,
+      "augmented_count": 60,
+      "final_count": 72
+    },
+    "D": {
+      "original_count": 12,
+      "augmented_count": 60,
+      "final_count": 72
+    },
+    "E": {
+      "original_count": 14,
+      "augmented_count": 70,
+      "final_count": 84
+    },
+    "F": {
+      "original_count": 11,
+      "augmented_count": 55,
+      "final_count": 66
+    },
+    "G": {
+      "original_count": 14,
+      "augmented_count": 70,
+      "final_count": 84
+    },
+    "HappyBirthday": {
+      "original_count": 12,
+      "augmented_count": 60,
+      "final_count": 72
+    },
+    "I": {
+      "original_count": 21,
+      "augmented_count": 105,
+      "final_count": 126
+    },
+    "L": {
+      "original_count": 18,
+      "augmented_count": 90,
+      "final_count": 108
+    },
+    "M": {
+      "original_count": 15,
+      "augmented_count": 75,
+      "final_count": 90
+    },
+    "O": {
+      "original_count": 11,
+      "augmented_count": 55,
+      "final_count": 66
+    },
+    "Please": {
+      "original_count": 12,
+      "augmented_count": 60,
+      "final_count": 72
+    },
+    "Sun": {
+      "original_count": 18,
+      "augmented_count": 90,
+      "final_count": 108
+    },
+    "V": {
+      "original_count": 8,
+      "augmented_count": 40,
+      "final_count": 48
+    },
+    "W": {
+      "original_count": 19,
+      "augmented_count": 95,
+      "final_count": 114
+    },
+    "X": {
+      "original_count": 11,
+      "augmented_count": 55,
+      "final_count": 66
+    },
+    "goodmorning": {
+      "original_count": 13,
+      "augmented_count": 65,
+      "final_count": 78
+    },
+    "how are you": {
+      "original_count": 17,
+      "augmented_count": 85,
+      "final_count": 102
+    }
+  },
+  "total_originals": 275,
+  "total_augmented": 1375,
+  "total_final": 1650,
+  "elapsed_seconds": 172.26,
+  "completed_time": "2026-11-02 21:03:25"
+}
