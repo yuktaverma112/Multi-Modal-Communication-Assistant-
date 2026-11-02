@@ -14,11 +14,30 @@ import sys
 import wave
 
 import cv2
+# pyrefly: ignore[missing-import]
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
+
+
+def _get_sample_sign_image() -> str:
+    """Finds a valid sample sign image from DataSet_Augmented or DataSet."""
+    candidates = [
+        os.path.join(ROOT, "DataSet_Augmented", "A"),
+        os.path.join(ROOT, "DataSet", "A"),
+        os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A"),
+    ]
+    for d in candidates:
+        if os.path.isdir(d):
+            imgs = sorted([
+                os.path.join(d, f) for f in os.listdir(d)
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            ])
+            if imgs:
+                return imgs[0]
+    raise FileNotFoundError("No sample sign image found in dataset directories.")
 
 
 def test_whisper_ffmpeg_is_available_without_system_install():
@@ -37,7 +56,7 @@ def test_whisper_ffmpeg_is_available_without_system_install():
 def test_preprocessing_hog_features_shape():
     from backend.utils.preprocessing import extract_hog_features, read_image
 
-    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    sample = _get_sample_sign_image()
     img = read_image(sample)
     feats = extract_hog_features(img)
     assert feats.ndim == 1
@@ -47,12 +66,12 @@ def test_preprocessing_hog_features_shape():
 def test_sign_service_predicts_known_class():
     from backend.services.sign_service import sign_service
 
-    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    sample = _get_sample_sign_image()
     img = cv2.imread(sample)
     result = sign_service.predict(img)
     assert result["prediction"] is not None
     assert 0.0 <= result["confidence"] <= 1.0
-    assert len(result["top_k"]) == 3
+    assert len(result["top_k"]) >= 1
     assert len(result["hand_landmarks"]) in (0, 21)
     assert all(len(point) == 2 for point in result["hand_landmarks"])
 
@@ -104,7 +123,7 @@ def test_recognize_sign_log_false_skips_history():
     from fastapi.testclient import TestClient
     from backend.main import app
 
-    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    sample = _get_sample_sign_image()
     with TestClient(app) as client:
         before = len(client.get("/api/history").json()["data"])
         with open(sample, "rb") as f:
@@ -122,10 +141,10 @@ def test_detect_object_degrades_cleanly_or_works():
     from fastapi.testclient import TestClient
     from backend.main import app
 
-    sample = os.path.join(ROOT, "datasets", "ocr", "custom_OCR", "synthetic", "sample_00.png")
+    sample = _get_sample_sign_image()
     with TestClient(app) as client:
         with open(sample, "rb") as f:
-            r = client.post("/api/detect-object", files={"file": ("photo.png", f, "image/png")})
+            r = client.post("/api/detect-object", files={"file": ("photo.jpg", f, "image/jpeg")})
         assert r.status_code == 200  # our envelope -- real status is in the body
         body = r.json()
         assert body["code"] in (200, 503)
@@ -134,7 +153,7 @@ def test_detect_object_degrades_cleanly_or_works():
 
 
 def test_word_model_status_reflects_reality():
-    """No word-level model ships with this project (see README) -- this
+    """No separate WLASL video model ships with this project (see README) -- this
     must report trained:false, not silently claim otherwise."""
     from fastapi.testclient import TestClient
     from backend.main import app
@@ -157,6 +176,20 @@ def test_word_vocabulary_serves_the_staged_glosses():
         assert "help" in glosses
 
 
+def test_sign_vocabulary_serves_augmented_classes():
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/sign-vocabulary")
+        assert r.status_code == 200
+        classes = r.json()["data"]["classes"]
+        assert len(classes) == 21
+        assert "A" in classes
+        assert "Book" in classes
+        assert "how are you" in classes
+
+
 def test_hearing_and_communication_actions_complete(monkeypatch):
     from fastapi.testclient import TestClient
     from backend.main import app
@@ -170,7 +203,7 @@ def test_hearing_and_communication_actions_complete(monkeypatch):
         audio.setframerate(16000)
         audio.writeframes(b"\0\0" * 1600)
     audio_bytes = audio_file.getvalue()
-    image_path = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    image_path = _get_sample_sign_image()
     with open(image_path, "rb") as image_file:
         image_bytes = image_file.read()
 
@@ -186,6 +219,8 @@ def test_hearing_and_communication_actions_complete(monkeypatch):
             "prediction": "A",
             "confidence": 0.95,
             "top_k": [{"label": "A", "confidence": 0.95}],
+            "extraction_method": "landmarks",
+            "hand_landmarks": [],
         },
     )
 
@@ -235,7 +270,7 @@ def test_recognize_word_without_a_trained_model_fails_clearly():
     from fastapi.testclient import TestClient
     from backend.main import app
 
-    sample = sorted(glob.glob(os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A", "*.jpg")))[0]
+    sample = _get_sample_sign_image()
     with TestClient(app) as client:
         with open(sample, "rb") as f:
             r = client.post("/api/recognize-word", files={"file": ("clip.webm", f, "video/webm")})

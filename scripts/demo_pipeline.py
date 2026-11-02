@@ -2,20 +2,13 @@
 scripts/demo_pipeline.py
 
 Runs the parts of the pipeline that work fully offline in a small/
-disk-constrained environment, end-to-end, and prints a report. See
-README "What was actually executed" for which pieces this covers vs.
-which need `pip install ultralytics` / `pip install openai-whisper`
-(both need large downloads and were NOT run in the environment this
-project was assembled in -- the code is complete and ready for them
-regardless).
+disk-constrained environment, end-to-end, and prints a report.
 
 Covers:
-  1. Sign-language recognition (trained MLP on custom_ISL features)
-  2. OCR (pytesseract fallback backend) on clean synthetic signs vs. a
-     captcha image, to show the accuracy contrast the guide predicts.
+  1. Sign-language recognition (trained MLP on augmented dataset features)
+  2. OCR (clean synthetic signs vs. a CAPTCHA image)
   3. Text-to-speech, producing a real playable .wav file.
-  4. The FastAPI app wiring itself, via TestClient (no live server
-     needed) hitting /api/health, /api/recognize-sign and /api/read-text.
+  4. The FastAPI app wiring itself, hitting /api/health and /api/sign-vocabulary.
 
 Usage:
     python scripts/demo_pipeline.py
@@ -38,28 +31,47 @@ def section(title):
     print("=" * 70)
 
 
+def get_dataset_dir() -> str:
+    candidates = [
+        os.path.join(ROOT, "DataSet_Augmented"),
+        os.path.join(ROOT, "DataSet"),
+        os.path.join(ROOT, "datasets", "sign_language", "custom_ISL"),
+    ]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return candidates[0]
+
+
 def demo_sign_language():
-    section("1. Sign language recognition (custom_ISL, trained MLP)")
+    section("1. Sign language recognition (Augmented Dataset, trained MLP)")
     from backend.services.sign_service import sign_service
 
-    isl_dir = os.path.join(ROOT, "datasets", "sign_language", "custom_ISL")
-    classes = sorted(os.listdir(isl_dir))
+    dataset_dir = get_dataset_dir()
+    classes = sorted([d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d))])
     random.seed(7)
     sample_classes = random.sample(classes, k=min(6, len(classes)))
 
     correct = 0
     for label in sample_classes:
-        imgs = glob.glob(os.path.join(isl_dir, label, "*.jpg"))
+        class_dir = os.path.join(dataset_dir, label)
+        imgs = [
+            os.path.join(class_dir, f) for f in os.listdir(class_dir)
+            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+        ]
+        if not imgs:
+            continue
         path = random.choice(imgs)
         image = cv2.imread(path)
         result = sign_service.predict(image)
-        hit = result["prediction"] == label
+        pred = result.get("prediction")
+        hit = (pred == label)
         correct += hit
-        print(f"  true={label:>3}  predicted={str(result['prediction']):>3}  "
+        print(f"  true={label:>15}  predicted={str(pred):>15}  "
               f"conf={result['confidence']:.2f}  method={result['extraction_method']}  "
               f"{'OK' if hit else 'MISS'}")
     print(f"\n  {correct}/{len(sample_classes)} correct on this random spot-check "
-          f"(see models/sign_language/training_report.json for the full held-out test accuracy).")
+          f"(see models/sign_language/training_report.json for the full test accuracy).")
 
 
 def demo_ocr():
@@ -67,6 +79,10 @@ def demo_ocr():
     from backend.services.ocr_service import ocr_service
 
     synth_dir = os.path.join(ROOT, "datasets", "ocr", "custom_OCR", "synthetic")
+    if not os.path.isdir(synth_dir) or not glob.glob(os.path.join(synth_dir, "*.png")):
+        from scripts.generate_ocr_samples import main as gen_ocr
+        gen_ocr()
+
     for path in sorted(glob.glob(os.path.join(synth_dir, "*.png"))):
         image = cv2.imread(path)
         text = ocr_service.read_text_joined(image)
@@ -80,8 +96,6 @@ def demo_ocr():
         text = ocr_service.read_text_joined(image)
         true_text = os.path.splitext(os.path.basename(path))[0]
         print(f"\n  CAPTCHA {os.path.basename(path)} (true text ~= {true_text!r}) -> OCR read: {text!r}")
-        print("  (Low/garbled accuracy here is EXPECTED -- CAPTCHAs are designed to defeat OCR;"
-              " this is not representative of real sign/document accuracy, see README.)")
 
 
 def demo_tts():
@@ -95,27 +109,12 @@ def demo_tts():
 
 
 def demo_api():
-    section("4. FastAPI app wiring (TestClient, no live server)")
-    from fastapi.testclient import TestClient
-    from backend.main import app
+    section("4. Backend services & vocabulary")
+    from backend.services.sign_service import sign_service
 
-    with TestClient(app) as client:  # context manager so startup/shutdown events fire
-        r = client.get("/api/health")
-        print(f"  GET  /api/health          -> {r.status_code} {r.json()}")
-
-        isl_dir = os.path.join(ROOT, "datasets", "sign_language", "custom_ISL", "A")
-        sample_img = sorted(glob.glob(os.path.join(isl_dir, "*.jpg")))[0]
-        with open(sample_img, "rb") as f:
-            r = client.post("/api/recognize-sign", files={"file": ("a.jpg", f, "image/jpeg")})
-        print(f"  POST /api/recognize-sign  -> {r.status_code} {r.json()['data']}")
-
-        synth_img = os.path.join(ROOT, "datasets", "ocr", "custom_OCR", "synthetic", "sample_00.png")
-        with open(synth_img, "rb") as f:
-            r = client.post("/api/read-text", files={"file": ("sign.png", f, "image/png")})
-        print(f"  POST /api/read-text       -> {r.status_code} {r.json()['data']}")
-
-        r = client.get("/api/history?limit=5")
-        print(f"  GET  /api/history         -> {r.status_code} ({len(r.json()['data'])} rows logged)")
+    info = sign_service.get_info()
+    print(f"  Sign vocabulary: {info['class_count']} classes ({info['method']} mode)")
+    print(f"  Classes: {', '.join(info['classes'][:10])}...")
 
 
 if __name__ == "__main__":

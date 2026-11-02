@@ -11,6 +11,13 @@ from backend.database import crud
 router = APIRouter(prefix="/api", tags=["sign_language"])
 
 
+@router.get("/sign-vocabulary")
+def sign_vocabulary():
+    """Returns the list of classes supported by the trained sign model."""
+    info = sign_service.get_info()
+    return ok(info)
+
+
 @router.post("/recognize-sign")
 async def recognize_sign(
     file: UploadFile = File(...),
@@ -22,7 +29,7 @@ async def recognize_sign(
     Camera -> MediaPipe/HOG -> MLP -> sign -> text/voice.
 
     log=False is used by the real-time polling loop in the Live
-    Translate view (frontend/static/js/live.js), which calls this
+    Translate view (frontend/static/js/app.js), which calls this
     endpoint several times a second -- logging every poll would flood
     /api/history with noise instead of meaningful interactions. The
     one-shot "Recognize sign" button elsewhere still logs by default."""

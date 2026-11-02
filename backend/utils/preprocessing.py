@@ -95,8 +95,10 @@ def _get_landmarker():
         base_options = mp_python.BaseOptions(model_asset_path=MEDIAPIPE_MODEL_PATH)
         options = mp_vision.HandLandmarkerOptions(
             base_options=base_options,
-            num_hands=1,
-            min_hand_detection_confidence=0.3,
+            num_hands=2,
+            min_hand_detection_confidence=0.15,
+            min_hand_presence_confidence=0.15,
+            min_tracking_confidence=0.15,
         )
         _landmarker = mp_vision.HandLandmarker.create_from_options(options)
         return _landmarker
@@ -134,7 +136,14 @@ def extract_hand_landmark_points(image: np.ndarray) -> np.ndarray | None:
     if not result.hand_landmarks:
         return None
 
-    lm = result.hand_landmarks[0]
+    if len(result.hand_landmarks) > 1:
+        # Pick the most prominent / largest hand in the detection area
+        lm = max(
+            result.hand_landmarks,
+            key=lambda h: (max(p.x for p in h) - min(p.x for p in h)) * (max(p.y for p in h) - min(p.y for p in h))
+        )
+    else:
+        lm = result.hand_landmarks[0]
     return np.array([[p.x, p.y, p.z] for p in lm], dtype=np.float32)
 
 

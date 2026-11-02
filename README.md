@@ -22,7 +22,7 @@ cleanly" rather than "verified working," through no fault of the code.
 
 | Module | Status |
 |---|---|
-| Sign language recognition (custom_ISL) | **Trained & tested.** MLP on HOG features, 23 letter classes, 702 images. Test accuracy 44.7% (random split) -- see `models/sign_language/training_report.json`. |
+| Sign language recognition (DataSet_Augmented) | **Trained & tested.** MLP on 3D MediaPipe Hand Landmarks (63 dimensions), 21 classes (14 letters + 7 words/phrases: Book, Congratulations, goodmorning, HappyBirthday, how are you, Please, Sun), 1,650 augmented images. Test accuracy 91.5% -- see `models/sign_language/training_report.json`. |
 | OCR | **Working**, pytesseract backend verified on 6 clean synthetic signs + 1 CAPTCHA (accuracy contrast is expected/documented). EasyOCR wired as the primary backend for when you install it. |
 | Text-to-speech | **Working**, produces real `.wav` files via pyttsx3/espeak-ng. |
 | FastAPI backend + routing + SQLite history | **Working**, verified end-to-end via `scripts/demo_pipeline.py` and `pytest`. |
@@ -157,42 +157,43 @@ backend/
   services/                One class per AI capability (model loading, inference)
   database/                SQLAlchemy models/session/crud (SQLite)
   utils/                   Image decode, feature extraction, audio save, response envelope
+DataSet/                  Your uploaded ISL gesture dataset (21 classes, 275 photos)
+DataSet_Augmented/        Generated augmented dataset (1,650 images, 5x domain-safe transforms)
 frontend/
   static/                  Working plain HTML/CSS/JS app (index.html, css/, js/)
   src/                     Placeholder for a future React rewrite (see "Frontend" below)
 models/
-  sign_language/           Trained MLP + scaler + label encoder + training report (committed)
-  yolo/                     yolo11n.pt lands here on first run (gitignored, re-downloaded)
-  mediapipe/                hand_landmarker.task lands here on first run (gitignored)
+  sign_language/           Trained MLP + scaler + label encoder + training report (91.5% accuracy)
+  yolo/                    yolo11n.pt lands here on first run (gitignored, re-downloaded)
+  mediapipe/               hand_landmarker.task (MediaPipe Tasks 3D hand landmarks model)
 datasets/
   sign_language/
-    custom_ISL/             Your uploaded ISL fingerspelling images (23 letters)
-    WLASL100/                Derived WLASL metadata (glosses + download-list CSV) -- see "WLASL" below
+    custom_ISL/            Fallback path (symlinked / mapped to DataSet_Augmented)
+    WLASL100/              Derived WLASL metadata (glosses + download-list CSV) -- see "WLASL" below
   ocr/custom_OCR/
-    synthetic/               6 generated clean sign/label images (real OCR eval target)
-    data/sample/              1 sample CAPTCHA image (adversarial stress-test, not a fair eval set)
-  object_detection_coco/     coco_80_classes.json (category names only -- see "COCO" below)
-  speech/LibriSpeech/        empty, not uploaded
-  sound/ESC-50/              empty, not uploaded (Phase 2)
-scripts/                    One-off data prep / training / demo scripts (see below)
-tests/                       pytest suite
-outputs/                     Runtime-generated TTS audio + uploads (gitignored)
+    synthetic/             6 generated clean sign/label images (real OCR eval target)
+    data/sample/           1 sample CAPTCHA image (adversarial stress-test, not a fair eval set)
+  object_detection_coco/   coco_80_classes.json (category names only -- see "COCO" below)
+  speech/LibriSpeech/      empty, not uploaded
+  sound/ESC-50/            empty, not uploaded (Phase 2)
+scripts/                  Data prep / augmentation / training / demo scripts (see below)
+tests/                    pytest suite
+outputs/                  Runtime-generated TTS audio + uploads (gitignored)
 ```
-
-*Removed to keep the repo lean (none of it is needed to run the app):* the two 12MB reference Kaggle notebooks, the raw 12MB `WLASL_v0.3.json` (its derived outputs are kept), and 1,070 of the 1,071 uploaded CAPTCHA images (only the one used by `demo_pipeline.py` is kept). See "Cleanup notes" below.
 
 ## Scripts
 
 | Script | What it does |
 |---|---|
-| `scripts/extract_isl_landmarks.py` | Walks `custom_ISL/`, extracts a feature vector per image (MediaPipe landmarks if available, HOG fallback), saves `isl_features.npz`. |
-| `scripts/train_sign_model.py` | Trains the MLP on those features, saves model/scaler/encoder + `training_report.json`. |
-| `scripts/explore_wlasl.py` | Parses `WLASL_v0.3.json` (re-download it if you want to regenerate the list -- see the script's docstring), ranks glosses, writes the WLASL100 class list + a CSV of clip URLs. |
-| `scripts/download_wlasl_clips.py` | Optional: actually downloads WLASL video clips (needs unrestricted internet, run on your own machine). |
-| `scripts/generate_ocr_samples.py` | Renders 6 clean sign/label images for a fair OCR eval set. |
-| `scripts/extract_word_landmarks.py` | Turns word-sign video clips (`datasets/sign_language/word_clips/<word>/*.mp4`, you supply these) into pooled per-clip feature descriptors. |
-| `scripts/train_word_model.py` | Trains the word-level MLP on those descriptors; same architecture/output convention as `train_sign_model.py`. |
-| `scripts/demo_pipeline.py` | End-to-end offline smoke test (see below). |
+| `scripts/augment_dataset.py` | Augments `DataSet/` images using domain-safe spatial, color, blur, noise, and occlusion transforms; outputs to `DataSet_Augmented/`. |
+| `scripts/extract_isl_landmarks.py` | Extracts 63-dimensional MediaPipe hand landmarks from `DataSet_Augmented/` into `isl_features.npz`. |
+| `scripts/train_sign_model.py` | Trains the MLP classifier on landmark features, saving model/scaler/encoder + `training_report.json` (91.5% test accuracy across 21 classes). |
+| `scripts/explore_wlasl.py` | Parses `WLASL_v0.3.json`, ranks glosses, writes the WLASL100 class list + CSV of clip URLs. |
+| `scripts/download_wlasl_clips.py` | Optional: downloads WLASL video clips (needs unrestricted internet). |
+| `scripts/generate_ocr_samples.py` | Renders 6 clean sign/label images for OCR evaluation. |
+| `scripts/extract_word_landmarks.py` | Turns word-sign video clips into pooled per-clip feature descriptors. |
+| `scripts/train_word_model.py` | Trains the word-level MLP on those descriptors. |
+| `scripts/demo_pipeline.py` | End-to-end offline pipeline verification test. |
 
 ## What was actually executed here
 

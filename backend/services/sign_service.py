@@ -10,15 +10,9 @@ Loads the artifacts produced by:
     scripts/extract_isl_landmarks.py   -> models/sign_language/isl_features.npz
     scripts/train_sign_model.py        -> sign_model.pkl, scaler.pkl, label_encoder.pkl
 
-Important: this is trained on the custom_ISL dataset you provided,
-which is STATIC fingerspelling images (23 letter classes -- see
-training_report.json), not the dynamic word-level signs described as
-the eventual target ("hello", "water", "help", ...) in the project
-guide. Treat this as the Phase-1 proof-of-concept: same architecture
-and pipeline, smaller/easier vocabulary. Swapping in a real word-level
-custom_ISL video dataset later only requires re-running the two
-scripts above with LSTM-style sequence features instead of a single
-frame -- the API/service layer here does not need to change shape.
+Trained on the augmented dataset across 21 classes (both alphabet fingerspelling
+and whole-word/phrase signs: A-X, Book, Congratulations, goodmorning, HappyBirthday,
+how are you, Please, Sun).
 """
 from __future__ import annotations
 
@@ -56,6 +50,21 @@ class SignService:
             self._scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.pkl"))
             self._encoder = joblib.load(os.path.join(MODEL_DIR, "label_encoder.pkl"))
 
+    def get_classes(self) -> List[str]:
+        self._ensure_loaded()
+        return [str(c) for c in self._encoder.classes_]
+
+    def get_info(self) -> Dict:
+        self._ensure_loaded()
+        expected_dim = self._scaler.mean_.shape[0]
+        classes = self.get_classes()
+        return {
+            "feature_dim": expected_dim,
+            "method": "landmarks" if expected_dim == 63 else "hog",
+            "class_count": len(classes),
+            "classes": classes,
+        }
+
     def predict(self, image: np.ndarray, top_k: int = 3) -> Dict:
         """image: a BGR frame/crop containing (ideally) a single hand.
         Returns {"prediction": str, "confidence": float,
@@ -70,7 +79,7 @@ class SignService:
         )
         expected_dim = self._scaler.mean_.shape[0]
         if feats.shape[0] != expected_dim:
-            # Model was trained on HOG (or landmarks) only -- force the
+            # Model was trained on landmarks (63-d) or HOG -- force the
             # matching extractor rather than silently mis-predicting.
             from backend.utils.preprocessing import extract_hog_features, extract_hand_landmarks
             if expected_dim == 63:

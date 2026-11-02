@@ -52,8 +52,11 @@ class OCRService:
             self._reader = easyocr.Reader(["en"], gpu=False)
             self._backend = "easyocr"
         except Exception:
-            import pytesseract  # noqa: F401  (import check only)
-            self._backend = "pytesseract"
+            try:
+                import pytesseract  # noqa: F401  (import check only)
+                self._backend = "pytesseract"
+            except Exception:
+                self._backend = "none"
 
     @staticmethod
     def _preprocess(image: np.ndarray) -> np.ndarray:
@@ -68,6 +71,9 @@ class OCRService:
     def read_text(self, image: np.ndarray) -> List[Dict]:
         self._ensure_loaded()
         processed = self._preprocess(image)
+
+        if self._backend == "none":
+            return [{"text": "(OCR unavailable: install easyocr or pytesseract)", "confidence": 0.0}]
 
         if self._backend == "easyocr":
             results = self._reader.readtext(processed)

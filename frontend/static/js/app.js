@@ -603,8 +603,8 @@ $("object-btn").addEventListener("click", async () => {
   showResult(
     "object-result",
     confidenceBadge(conf, "detection confidence") +
-      `<p class="result-text big">${escapeHTML(description)}</p>` +
-      spokenControls(audio, description)
+    `<p class="result-text big">${escapeHTML(description)}</p>` +
+    spokenControls(audio, description)
   );
   if (speak) speakText(description, audio);
   refreshDashboard();
@@ -629,8 +629,8 @@ $("ocr-btn").addEventListener("click", async () => {
   showResult(
     "ocr-result",
     confidenceBadge(avgConf, "reading confidence") +
-      `<p class="result-text big">${escapeHTML(text)}</p>` +
-      spokenControls(audio, text)
+    `<p class="result-text big">${escapeHTML(text)}</p>` +
+    spokenControls(audio, text)
   );
   if (speak && json.data.text) speakText(text, audio);
   refreshDashboard();
@@ -671,7 +671,7 @@ $("sign-btn").addEventListener("click", async () => {
       "sign-result",
       confidenceBadge(json.data.confidence, "recognition confidence") +
       `<p class="result-text big">${escapeHTML(json.data.prediction)}</p>` +
-        rankList(json.data.top_k) +
+      rankList(json.data.top_k) +
       spokenControls(audio, json.data.prediction)
     );
     if (speak) speakText(json.data.prediction, audio);
@@ -904,10 +904,12 @@ function getGuideCrop(video) {
   const scale = Math.max(frame.width / video.videoWidth, frame.height / video.videoHeight);
   const offsetX = (video.videoWidth * scale - frame.width) / 2;
   const offsetY = (video.videoHeight * scale - frame.height) / 2;
-  const left = Math.max(0, (guide.left - frame.left + offsetX) / scale);
-  const top = Math.max(0, (guide.top - frame.top + offsetY) / scale);
-  const right = Math.min(video.videoWidth, (guide.right - frame.left + offsetX) / scale);
-  const bottom = Math.min(video.videoHeight, (guide.bottom - frame.top + offsetY) / scale);
+  const padX = video.videoWidth * 0.03;
+  const padY = video.videoHeight * 0.03;
+  const left = Math.max(0, (guide.left - frame.left + offsetX) / scale - padX);
+  const top = Math.max(0, (guide.top - frame.top + offsetY) / scale - padY);
+  const right = Math.min(video.videoWidth, (guide.right - frame.left + offsetX) / scale + padX);
+  const bottom = Math.min(video.videoHeight, (guide.bottom - frame.top + offsetY) / scale + padY);
   return { left, top, width: right - left, height: bottom - top };
 }
 
@@ -978,7 +980,11 @@ async function pollLiveFrame(sessionId) {
       !(candidateLabel === lastCommittedLabel && requireBreakBeforeRepeat);
 
     if (readyToCommit) {
-      sentenceText += candidateLabel;
+      if (candidateLabel.length > 1) {
+        sentenceText = (sentenceText.trimEnd() + (sentenceText.trim().length > 0 ? " " : "") + candidateLabel + " ");
+      } else {
+        sentenceText += candidateLabel;
+      }
       renderSentence();
       lastCommittedLabel = candidateLabel;
       requireBreakBeforeRepeat = true;
